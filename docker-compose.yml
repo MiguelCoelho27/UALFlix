@@ -1,20 +1,32 @@
 version: "3.9"
+
 services:
   catalog:
     build: ./catalog-service
     ports:
       - "5001:5000"
+    volumes:
+      - catalog_data:/app
+
   streaming:
     build: ./streaming-service
     ports:
       - "5002:5000"
+
   upload:
     build: ./upload-service
     ports:
       - "5003:5000"
+    volumes:
+      - upload_data:/app/uploads
+
   nginx:
     image: nginx:latest
     ports:
       - "80:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+
+volumes:
+  catalog_data:
+  upload_data:
