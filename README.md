@@ -2,37 +2,45 @@
 
 UALFlix é um **mini sistema de streaming de vídeo** desenvolvido no âmbito da unidade curricular de **Arquitetura Avançada de Sistemas (AAS)** da Universidade Autónoma de Lisboa.
 
-Este projeto demonstra, de forma prática, a utilização de tecnologias modernas aplicadas a **sistemas distribuídos**, **clustering**, **virtualização**, **cloud computing**, **replicação de dados e serviços**, bem como a **avaliação de desempenho**.
+Este projeto demonstra, de forma prática, a aplicação de conceitos avançados de **sistemas distribuídos**, **comunicação entre serviços**, **virtualização com Docker**, **replicação e resiliência**, e **preparação para cloud computing**.
 
 ---
 
-## ✨ Funcionalidades do Projeto
+## ✨ Funcionalidades
 
 - 🎞️ **Catálogo de Vídeos**  
-  Consulta de vídeos disponíveis com título, descrição e duração.
+  Permite registar, consultar e persistir vídeos com título, descrição e duração.
 
 - 📤 **Upload de Conteúdo**  
-  Simulação de envio de vídeos para posterior processamento.
+  Simula o envio de vídeos, gerando uma resposta de sucesso. Já suporta persistência dos uploads.
 
-- 📺 **Serviço de Streaming**  
-  A disponibilizar futuramente — transmissão de vídeos sob pedido.
+- 📺 **Streaming de Vídeos**  
+  Serviço funcional que inicia sessões de streaming com base num `video_id`.
 
-- 📦 **Microserviços com Docker**  
-  Cada componente do sistema corre isoladamente em containers Docker.
+- 📡 **Comunicação RESTful entre microserviços**
 
-- ☁️ **Preparado para Execução na Cloud**  
-  Design pronto para escalabilidade e implantação em ambiente cloud.
+- 📦 **Serviços isolados em Docker containers**
+
+- ☁️ **Arquitetura preparada para cloud e escalabilidade**
 
 ---
 
-## 🔧 Tecnologias Utilizadas
+## 🧱 Estrutura de Microserviços
 
-- **Linguagem:** Python 3.11  
-- **Framework:** Flask  
-- **Containerização:** Docker + Docker Compose  
-- **Gateway HTTP reverso:** Nginx  
-- **Simulação de Base de Dados:** Estruturas em memória (listas Python)  
-- **APIs REST:** Comunicação simples e eficaz entre serviços
+- `catalog-service` – Gestão e persistência dos vídeos.
+- `upload-service` – Simulação de upload de vídeos.
+- `streaming-service` – Inicia sessões de visualização.
+- `nginx` – Reverso para entrada HTTP (porta 80).
+
+---
+
+## 🔧 Tecnologias
+
+- **Python 3.11** com Flask
+- **Docker + Docker Compose**
+- **Nginx** como gateway reverso
+- **Bases de dados simuladas em memória**
+- **Requisitos em ficheiros `requirements.txt`**
 
 ---
 
@@ -43,27 +51,30 @@ Este projeto demonstra, de forma prática, a utilização de tecnologias moderna
 git clone https://github.com/MiguelCoelho27/UALFlix.git
 cd UALFlix
 
-# Executar os serviços
+# Executar com Docker
 docker-compose up --build
-```
+✅ Estado Atual
+✔️ Upload funcional e persistente
 
----
+✔️ Catálogo funcional e persistente
 
-## ✅ Estado Atual
+✔️ Streaming funcional
 
-- Catálogo e Upload testados com sucesso  
-- Streaming ainda não testado  
-- Nginx funcionando como reverso, pronto para servir frontend e backend
+✔️ Nginx a encaminhar pedidos corretamente
 
----
+🔄 Pronto para testes de desempenho e replicação
 
-## 📚 Requisitos Académicos
+📚 Requisitos Académicos
+Este projeto cumpre os requisitos definidos pela docente:
 
-Este projeto cumpre os seguintes requisitos definidos pela docente:
+✔️ Sistema distribuído com comunicação entre serviços
 
-- ✔️ **Sistema distribuído** com comunicação entre componentes
-- ✔️ **Cluster de computadores** com containers Docker (3+ serviços)
-- ✔️ **Virtualização** via Docker
-- ✔️ **Preparado para execução cloud**
-- ✔️ **Mecanismo de replicação a ser adicionado**
-- ✔️ **Avaliação de desempenho a ser integrada**
+✔️ Cluster de serviços (upload, catálogo, streaming)
+
+✔️ Virtualização via Docker
+
+✔️ Preparado para execução na cloud
+
+✔️ Simulação de replicação (em desenvolvimento)
+
+✔️ Avaliação de desempenho a integrar
