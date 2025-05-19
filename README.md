@@ -53,7 +53,8 @@ cd UALFlix
 
 # Executar com Docker
 docker-compose up --build
-✅ Estado Atual
+```
+## ✅ Estado Atual
 ✔️ Upload funcional e persistente
 
 ✔️ Catálogo funcional e persistente
@@ -64,7 +65,7 @@ docker-compose up --build
 
 🔄 Pronto para testes de desempenho e replicação
 
-📚 Requisitos Académicos
+## 📚 Requisitos Académicos
 Este projeto cumpre os requisitos definidos pela docente:
 
 ✔️ Sistema distribuído com comunicação entre serviços
