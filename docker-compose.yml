@@ -18,7 +18,7 @@ services:
     ports:
       - "5003:5000"
     volumes:
-      - upload_data:/app/uploads
+      - ./upload-service/uploads:/app/uploads
 
   nginx:
     image: nginx:latest
