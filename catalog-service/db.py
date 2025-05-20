@@ -1,6 +1,7 @@
 import sqlite3
+import os
 
-DB_NAME = "videos.db"
+DB_NAME = "catalog.db"
 
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
@@ -10,13 +11,60 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS videos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             description TEXT NOT NULL,
-            duration INTEGER NOT NULL
+            duration INTEGER NOT NULL,
+            views INTEGER DEFAULT 0,
+            genre TEXT,
         )
     ''')
+    
+    # TODO: Some Indexing for faster searching
+    
+     
     conn.commit()
     conn.close()
+    
+
+def get_all_videos():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM videos')
+    rows = cursor.fetchall()
+    
+    videos = []
+    
+    for row in rows:
+        videos.append({
+            'id': row['id'],
+            'title': row['title'],
+            'description': row['description'],
+            'duration': row['duration'],
+            'views': row['views'],
+            'genre': row['genre']
+        })
+    
+     
+    conn.close()
+    return videos
+    
+
+def create_video(title, description, duration, genre):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO videos (title, description, duration, genre)
+        VALUES(?, ?, ?)    
+        ''', (title, description, duration, genre))
+    
+    video_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+        
+    return video_id
