@@ -19,6 +19,11 @@ services:
       - "5003:5000"
     volumes:
       - ./upload-service/uploads:/app/uploads
+      
+  admin:
+    build: ./admin-service
+    ports:
+      - "5004:5000"
 
   nginx:
     image: nginx:latest
