@@ -1,4 +1,3 @@
-# upload-service/app.py
 from flask import Flask, request, jsonify
 import os
 import json

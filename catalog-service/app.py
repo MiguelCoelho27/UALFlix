@@ -5,11 +5,9 @@ app = Flask(__name__)
 
 @app.before_first_request
 def setup():
-    db.init_db
+    db.init_db()
 
 @app.route('/videos', methods=['POST'])
-
-# TODO: View Counter
 
 def create_video():
     data = request.get_json()
@@ -27,12 +25,20 @@ def create_video():
         "duration": data['duration'],
         "genre": data['genre'],
     }), 201
-    
 
 @app.route('/videos', methods=['GET'])
 def get_videos():
     videos = db.get_all_videos()
     return jsonify(videos)
+
+
+@app.route('/videos/<int:video_id>/view', methods=['POST'])
+def increment_view(video_id):
+    success = db.increment_view_count(video_id)
+    if success:
+        return jsonify({"status": "success"}), 200
+    else:
+        return jsonify({"error": "Video not found"}), 404
 
 
 if __name__ == '__main__':
