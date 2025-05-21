@@ -1,5 +1,4 @@
 import sqlite3
-import os
 
 DB_NAME = "catalog.db"
 
@@ -20,12 +19,11 @@ def init_db():
             description TEXT NOT NULL,
             duration INTEGER NOT NULL,
             views INTEGER DEFAULT 0,
-            genre TEXT,
+            genre TEXT
         )
     ''')
     
     # TODO: Some Indexing for faster searching
-    
      
     conn.commit()
     conn.close()
@@ -68,3 +66,15 @@ def create_video(title, description, duration, genre):
     conn.close()
         
     return video_id
+
+def increment_view_count(video_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('UPDATE videos SET views = views + 1 WHERE id = ?', (video_id,))
+    
+    row_count = cursor.rowcount
+    conn.commit()
+    conn.close()
+    
+    return row_count > 0
