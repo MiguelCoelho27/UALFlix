@@ -23,7 +23,8 @@ def init_db():
         )
     ''')
     
-    # TODO: Some Indexing for faster searching
+    CREATE INDEX IF NOT EXISTS idx_video_genre ON videos (genre);
+    CREATE INDEX IF NOT EXISTS idx_video_title ON videos(title);
      
     conn.commit()
     conn.close()
@@ -52,6 +53,22 @@ def get_all_videos():
     conn.close()
     return videos
     
+def get_video_by_id(video_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM videos WHERE id = ?', (video_id))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            'id': row['id'],
+            'title': row['title'],
+            'description': row['description'],
+            'duration': row['duration'],
+            'views': row['views'],
+            'genre': row['genre']
+        }
+    return None
 
 def create_video(title, description, duration, genre):
     conn = get_db_connection()
@@ -66,6 +83,7 @@ def create_video(title, description, duration, genre):
     conn.close()
         
     return video_id
+
 
 def increment_view_count(video_id):
     conn = get_db_connection()

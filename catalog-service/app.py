@@ -26,6 +26,15 @@ def create_video():
         "genre": data['genre'],
     }), 201
 
+
+@app.route('/videos/<int:video_id>', methods=['GET'])
+def get_video(video_id):
+    video = db.get_video_by_id(video_id)
+    if video:
+        return jsonify(video)
+    else:
+        return jsonify({"error": "Video not found"}), 404
+
 @app.route('/videos', methods=['GET'])
 def get_videos():
     videos = db.get_all_videos()
