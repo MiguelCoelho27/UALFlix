@@ -18,8 +18,8 @@ services:
     ports:
       - "5003:5000"
     volumes:
-      - ./upload-service/uploads:/app/uploads
-      
+      - ./upload-service/uploads_data:/app/uploads_data
+
   admin:
     build: ./admin-service
     ports:
