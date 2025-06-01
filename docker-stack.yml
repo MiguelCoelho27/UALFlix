@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  catalog:
+    image: ualflix_catalog
+    ports:
+      - "5001:5000"
+    networks:
+      - ualflix_net
+
+  upload:
+    image: ualflix_upload
+    ports:
+      - "5002:5002"
+    networks:
+      - ualflix_net
+
+  streaming:
+    image: ualflix_streaming
+    ports:
+      - "5003:5003"
+    networks:
+      - ualflix_net
+
+  admin:
+    image: ualflix_admin
+    ports:
+      - "5004:5004"
+    networks:
+      - ualflix_net
+
+  frontend:
+    image: miguelcoelho27/ualflix-frontend:latest
+    ports:
+      - "3000:80"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - ualflix_net
+
+  nginx:
+    image: ualflix_nginx
+    ports:
+      - "80:80"
+    networks:
+      - ualflix_net
+
+networks:
+  ualflix_net:
+    name: ualflix_ualflix_net
+    driver: overlay

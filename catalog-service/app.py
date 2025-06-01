@@ -1,8 +1,16 @@
 from flask import Flask, request, jsonify
+<<<<<<< HEAD
 
 app = Flask(__name__)
 
 @app.before_first_request
+=======
+import db
+
+app = Flask(__name__)
+
+@app.before_request
+>>>>>>> 5dab69248e2a0ad0dc450a10773cda28d924ee64
 def setup():
     db.init_db()
 
