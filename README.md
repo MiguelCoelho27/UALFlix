@@ -16,7 +16,7 @@ O sistema está dividido nos seguintes microserviços:
 - **Streaming Service**: Fornecimento de vídeos por stream
 - **NGINX (reverse proxy)**: Encaminhamento de pedidos e load balancing
 
-Todos os serviços comunicam entre si via HTTP e são orquestrados com Docker Compose.
+Todos os serviços comunicam entre si via HTTP e são orquestrados com Docker Swarm.
 
 ## 🧪 Endpoints Disponíveis
 
@@ -36,23 +36,30 @@ Todos os serviços comunicam entre si via HTTP e são orquestrados com Docker Co
 ### 🎥 Streaming Service (`http://localhost:5003`)
 - `GET /stream/<video_id>` – Acede ao vídeo via stream
 
-## 🐳 Como executar
-
+🐳 Como executar
 ```bash
 # Clonar o repositório
 git clone https://github.com/MiguelCoelho27/UALFlix.git
 cd UALFlix
 
-# Construir e executar os containers
-docker-compose up --build
+# Criar rede overlay (caso não exista)
+docker network create --driver overlay ualflix_ualflix_net
 
+# Fazer build das imagens
+docker build -t ualflix_catalog ./catalog-service
+docker build -t ualflix_upload ./upload-service
+docker build -t ualflix_streaming ./streaming-service
+docker build -t ualflix_admin ./admin-service
+docker build -t ualflix_nginx ./nginx
+
+# Lançar os serviços com Docker Swarm
+docker stack deploy -c docker-stack.yml ualflix
 ```
+
 🧪 Testes e Validação
 Testa os serviços com ferramentas como curl, Postman ou diretamente via browser:
 
 ```bash
-Copy
-Edit
 curl http://localhost:5001/catalog/videos
 curl -X POST http://localhost:5004/admin/videos -H "Content-Type: application/json" -d '{"title": "Exemplo", "description": "Teste", "url": "http://localhost:5003/stream/abc"}'
 ```
@@ -62,23 +69,19 @@ A persistência dos vídeos está implementada via ficheiros físicos (upload).
 O estado do catálogo e registos de vídeos mantêm-se entre reinícios dos containers, desde que os volumes não sejam removidos.
 
 📁 Estrutura do Projeto
-pgsql
-Copy
-Edit
+
 UALFlix/
 ├── admin-service/
 ├── catalog-service/
 ├── upload-service/
 ├── streaming-service/
 ├── nginx/
-└── docker-compose.yml
+└── docker-stack.yml
+
 Cada pasta contém:
-
-Dockerfile
-
-app.py (main)
-
-requirements.txt
+- Dockerfile
+- app.py (main)
+- requirements.txt
 
 ✅ Funcionalidades Implementadas
  Upload de vídeos
