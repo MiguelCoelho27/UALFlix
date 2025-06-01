@@ -6,5 +6,29 @@
     "title": "My Test Video",
     "timestamp": "2025-06-01T00:55:37.385203",
     "status": "uploaded"
+  },
+  {
+    "id": 2,
+    "filename": "elden.mp4",
+    "filepath": "uploads_data/videos/elden.mp4",
+    "title": "My Test Video",
+    "timestamp": "2025-06-01T10:42:06.688150",
+    "status": "uploaded"
+  },
+  {
+    "id": 3,
+    "filename": "elden.mp4",
+    "filepath": "uploads_data/videos/elden.mp4",
+    "title": "edadsadas",
+    "timestamp": "2025-06-01T10:43:11.854634",
+    "status": "uploaded"
+  },
+  {
+    "id": 4,
+    "filename": "videoplayback.mp4",
+    "filepath": "uploads_data/videos/videoplayback.mp4",
+    "title": "squidgame",
+    "timestamp": "2025-06-01T10:44:43.910958",
+    "status": "uploaded"
   }
 ]
