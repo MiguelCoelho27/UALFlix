@@ -4,8 +4,13 @@ import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
+type Video = {
+  title: string;
+  url: string;
+};
+
 export default function Home() {
-  const [videos, setVideos] = useState([]);
+  const [videos, setVideos] = useState<Video[]>([]);
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
 

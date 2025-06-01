@@ -29,6 +29,17 @@ services:
     networks:
       - ualflix_net
 
+  frontend:
+    image: miguelcoelho27/ualflix-frontend:latest
+    ports:
+      - "3000:80"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - ualflix_net
+
   nginx:
     image: ualflix_nginx
     ports:
