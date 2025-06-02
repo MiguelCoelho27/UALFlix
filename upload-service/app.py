@@ -2,27 +2,28 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename 
 import os
-import json
 from datetime import datetime
+from pymongo import MongoClient
+from bson import ObjectId
 
 app = Flask(__name__)
 CORS(app)
-UPLOADS_FOLDER = "uploads_data" # Mudança só para evitar problemas 
-UPLOADS_METADATA_FILE = os.path.join(UPLOADS_FOLDER, "uploads.json")
-ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi'} # Extensões de videos aceites para upload
 
-app.config['UPLOAD_FOLDER'] = UPLOADS_FOLDER
+UPLOADS_FOLDER_BASE = os.environ.get("UPLOADS_DIR", "/app/uploads_data") 
+VIDEO_FILES_SUBDIR = "videos" 
+VIDEO_FILES_PATH = os.path.join(UPLOADS_FOLDER_BASE, VIDEO_FILES_SUBDIR)
+
+app.config['UPLOAD_FOLDER'] = VIDEO_FILES_PATH
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024 
+ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
-# Garantir que a pasta existe
-os.makedirs(UPLOADS_FOLDER, exist_ok=True)
-os.makedirs(os.path.join(UPLOADS_FOLDER, "videos"), exist_ok=True) # Uma subfolder para os videos
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/ualflix")
+client = MongoClient(MONGO_URI)
+db = client.get_database()
+uploads_metadata_collection = db["uploads_metadata"]
 
-
-# Inicializar ficheiro se não existir
-if not os.path.exists(UPLOADS_METADATA_FILE):
-    with open(UPLOADS_METADATA_FILE, 'w') as f:
-        json.dump([], f)
+os.makedirs(UPLOADS_FOLDER_BASE, exist_ok=True)
+os.makedirs(VIDEO_FILES_PATH, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -31,61 +32,94 @@ def allowed_file(filename):
 @app.route('/upload', methods=['POST'])
 def upload_video_file():
     if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        return jsonify({"error": "No file part in the request"}), 400
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+        return jsonify({"error": "No file selected"}), 400
     
     title = request.form.get('title')
     description = request.form.get('description')
-    # genre = request.form.get('genre')
+    genre = request.form.get('genre', 'General')
     
     if not title or not description:
         return jsonify({"error": "Missing title or description"}), 400
     
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        video_path = os.path.join(app.config['UPLOAD_FOLDER'], "videos", filename)
-        file.save(video_path)
+        original_filename = secure_filename(file.filename)
+        unique_id_for_file = str(ObjectId()) 
+        _, ext = os.path.splitext(original_filename)
+        stored_filename = f"{unique_id_for_file}{ext}"
         
-        # Updating Metadata
-        with open(UPLOADS_METADATA_FILE, 'r+') as f:
-            uploads_metadata = json.load(f)
-            video_id = len(uploads_metadata) + 1
-            new_entry = {
-                "id": video_id,
-                "filename": filename,
-                "filepath": video_path, # Storing aactual file path
-                "title": title,
-                # "genre": genre,
-                "timestamp": datetime.now().isoformat(),
-                "status": "uploaded"
-            }
-            
-            uploads_metadata.append(new_entry)
-            f.seek(0)
-            f.truncate() # Clear file before wiring new data
-            json.dump(uploads_metadata, f, indent=2)
+        video_path_in_volume = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
         
-        # TODO: Adicionar notificações no catalogo sobre novos videos ?
-        return jsonify({"message": f"File '{filename}' uploaded successfully", "id": video_id, "title":title}), 201
-    else:
-        return jsonify({"error": "File type not allowed"}), 400
+        try:
+            file.save(video_path_in_volume)
+        except Exception as e:
+            app.logger.error(f"Failed to save file '{stored_filename}': {e}")
+            return jsonify({"error": f"Server error: Could not save file. {str(e)}"}), 500
 
+        video_access_url = f"/static_videos/{stored_filename}"
+
+        upload_metadata_entry = {
+            "original_filename": original_filename,
+            "stored_filename": stored_filename,
+            "filepath_in_volume": video_path_in_volume,
+            "video_access_url": video_access_url,
+            "title": title,
+            "description": description,
+            "genre": genre,
+            "timestamp": datetime.now().isoformat(),
+            "status": "uploaded",
+            "content_type": file.content_type,
+            "size_bytes": file.content_length 
+        }
+        
+        try:
+            result = uploads_metadata_collection.insert_one(upload_metadata_entry)
+            inserted_id_str = str(result.inserted_id)
+            # Deixar comentado por gora
+             
+            # catalog_service_url = os.environ.get("CATALOG_SERVICE_URL", "http://catalog:5000/videos")
+            # try:
+            #    duration_seconds = 0 
+            #    catalog_payload = {
+            #        "title": title, "description": description, "duration": duration_seconds,
+            #        "genre": genre, "video_url": video_access_url 
+            #    }
+            #    response = requests.post(catalog_service_url, json=catalog_payload, timeout=5)
+            #    response.raise_for_status() 
+            #    app.logger.info(f"Notified catalog service for video: {title}")
+            # except requests.exceptions.RequestException as e:
+            #    app.logger.error(f"Failed to notify catalog service for video '{title}': {e}")
+
+            return jsonify({
+                "message": f"File '{original_filename}' uploaded successfully as '{stored_filename}'.", 
+                "upload_id": inserted_id_str,
+                "title": title,
+                "video_access_url": video_access_url
+            }), 201
+        except Exception as e:
+            app.logger.error(f"Failed to insert metadata to MongoDB for '{original_filename}': {e}")
+            try:
+                os.remove(video_path_in_volume)
+                app.logger.info(f"Cleaned up orphaned file: {video_path_in_volume}")
+            except OSError as oe:
+                app.logger.error(f"Error cleaning up orphaned file '{video_path_in_volume}': {oe}")
+            return jsonify({"error": f"Server error: Could not save video metadata. {str(e)}"}), 500
+    else:
+        return jsonify({"error": "File type not allowed or no file provided."}), 400
 
 @app.route('/uploads', methods=['GET'])
 def list_uploads_metadata():
-    if not os.path.exists(UPLOADS_METADATA_FILE):
-        return jsonify([])
     try:
-        with open(UPLOADS_METADATA_FILE, 'r') as f:
-            uploads_metadata = json.load(f)
-        return jsonify(uploads_metadata), 200
-    except json.JSONDecodeError:
-        return jsonify({"error": "Metadata file is corrupted"}), 500
+        all_uploads = []
+        for upload_doc in uploads_metadata_collection.find():
+            upload_doc["_id"] = str(upload_doc["_id"])
+            all_uploads.append(upload_doc)
+        return jsonify(all_uploads), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+        app.logger.error(f"Failed to retrieve uploads metadata from MongoDB: {e}")
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True) 
