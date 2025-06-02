@@ -31,7 +31,7 @@ def get_video_by_id(video_id):
 def get_all_videos():
     videos = []
     for video in videos_collection.find():
-        video["_id"] = str(video["id"])
+        video["_id"] = str(video["_id"])
         videos.append(video)
     return videos
 

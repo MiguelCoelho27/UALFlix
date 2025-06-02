@@ -5,9 +5,15 @@ import os
 from datetime import datetime
 from pymongo import MongoClient
 from bson import ObjectId
+import requests 
+import logging # adicionado para perceber uns problemas 
 
 app = Flask(__name__)
 CORS(app)
+
+# logs basics
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 UPLOADS_FOLDER_BASE = os.environ.get("UPLOADS_DIR", "/app/uploads_data") 
 VIDEO_FILES_SUBDIR = "videos" 
@@ -55,10 +61,11 @@ def upload_video_file():
         try:
             file.save(video_path_in_volume)
         except Exception as e:
-            app.logger.error(f"Failed to save file '{stored_filename}': {e}")
+            logger.error(f"Failed to save file '{stored_filename}': {e}")
             return jsonify({"error": f"Server error: Could not save file. {str(e)}"}), 500
 
-        video_access_url = f"/static_videos/{stored_filename}"
+        
+        video_access_url = f"/static_videos/{stored_filename}" 
 
         upload_metadata_entry = {
             "original_filename": original_filename,
@@ -77,34 +84,46 @@ def upload_video_file():
         try:
             result = uploads_metadata_collection.insert_one(upload_metadata_entry)
             inserted_id_str = str(result.inserted_id)
-            # Deixar comentado por gora
-             
-            # catalog_service_url = os.environ.get("CATALOG_SERVICE_URL", "http://catalog:5000/videos")
-            # try:
-            #    duration_seconds = 0 
-            #    catalog_payload = {
-            #        "title": title, "description": description, "duration": duration_seconds,
-            #        "genre": genre, "video_url": video_access_url 
-            #    }
-            #    response = requests.post(catalog_service_url, json=catalog_payload, timeout=5)
-            #    response.raise_for_status() 
-            #    app.logger.info(f"Notified catalog service for video: {title}")
-            # except requests.exceptions.RequestException as e:
-            #    app.logger.error(f"Failed to notify catalog service for video '{title}': {e}")
+            
+            # --- Notify Catalog Service ---
+            catalog_service_url = os.environ.get("CATALOG_SERVICE_URL", "http://catalog:5000/videos")
+            duration_seconds = 0 
+            
+            catalog_payload = {
+                "title": title,
+                "description": description,
+                "duration": duration_seconds, 
+                "genre": genre,
+                "video_url": video_access_url 
+            }
+            logger.info(f"Attempting to notify catalog service at {catalog_service_url} with payload: {catalog_payload}")
+            
+            try:
+                response = requests.post(catalog_service_url, json=catalog_payload, timeout=10) # Increased timeout
+                response.raise_for_status() # Raises an exception for HTTP errors (4xx or 5xx)
+                logger.info(f"Successfully notified catalog service for video: {title}. Response: {response.json()}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Failed to notify catalog service for video '{title}': {e}")
+                # Decide on error handling:
+                # - Retry logic?
+                # - Mark upload metadata as "pending_catalog_registration"?
+                # - For now, the upload is successful, but catalog won't know.
+                # You might want to return a different message to the user or log this for manual intervention.
+                pass # Continue, but log the failure
 
             return jsonify({
-                "message": f"File '{original_filename}' uploaded successfully as '{stored_filename}'.", 
+                "message": f"File '{original_filename}' uploaded successfully as '{stored_filename}'. Catalog notification attempted.", 
                 "upload_id": inserted_id_str,
                 "title": title,
                 "video_access_url": video_access_url
             }), 201
         except Exception as e:
-            app.logger.error(f"Failed to insert metadata to MongoDB for '{original_filename}': {e}")
+            logger.error(f"Failed to insert metadata to MongoDB for '{original_filename}': {e}")
             try:
                 os.remove(video_path_in_volume)
-                app.logger.info(f"Cleaned up orphaned file: {video_path_in_volume}")
+                logger.info(f"Cleaned up orphaned file: {video_path_in_volume}")
             except OSError as oe:
-                app.logger.error(f"Error cleaning up orphaned file '{video_path_in_volume}': {oe}")
+                logger.error(f"Error cleaning up orphaned file '{video_path_in_volume}': {oe}")
             return jsonify({"error": f"Server error: Could not save video metadata. {str(e)}"}), 500
     else:
         return jsonify({"error": "File type not allowed or no file provided."}), 400
@@ -118,7 +137,7 @@ def list_uploads_metadata():
             all_uploads.append(upload_doc)
         return jsonify(all_uploads), 200
     except Exception as e:
-        app.logger.error(f"Failed to retrieve uploads metadata from MongoDB: {e}")
+        logger.error(f"Failed to retrieve uploads metadata from MongoDB: {e}")
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 if __name__ == '__main__':

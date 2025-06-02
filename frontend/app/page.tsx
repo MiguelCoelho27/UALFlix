@@ -1,157 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { VideoUploadForm } from "../components/video-upload-form";
+import { useState } from "react"; // No longer need useEffect or fetchVideos here
+import Link from "next/link"; // For navigation
+import { Button } from "@/components/ui/button";
+import { VideoUploadForm } from "../components/video-upload-form"; // Ensure this path is correct
+import { Video } from "lucide-react"; // Icon for catalog button
 
-interface Video {
-  _id: string;
-  title: string;
-  description: string;
-  genre?: string;
-  duration?: number;
-  video_access_url: string;
-  views?: number;
-  timestamp?: string;
-}
+// Video interface might not be needed on this page if not displaying catalog here
+// interface Video { ... }
 
-export default function Home() {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [isLoadingVideos, setIsLoadingVideos] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+export default function UploadPage() {
+  // State for videos, isLoadingVideos, fetchError is removed as catalog is on a separate page.
 
-  const fetchVideos = async () => {
-    setIsLoadingVideos(true);
-    setFetchError(null);
-    try {
-      const catalogApiUrl =
-        process.env.NEXT_PUBLIC_CATALOG_API_URL ||
-        "http://localhost:5001/videos";
-      const res = await fetch(catalogApiUrl);
-      if (!res.ok) {
-        const errorData = await res
-          .json()
-          .catch(() => ({ error: "Failed to parse error response" }));
-        throw new Error(
-          errorData.error ||
-            `Failed to fetch videos: ${res.status} ${res.statusText}`
-        );
-      }
-      const data = await res.json();
-      setVideos(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      console.error("Error fetching videos:", err);
-      setFetchError(
-        err.message || "An unknown error occurred while fetching videos."
-      );
-      setVideos([]);
-    } finally {
-      setIsLoadingVideos(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchVideos();
-  }, []);
+  const [lastUploadStatus, setLastUploadStatus] = useState<{
+    message: string;
+    data: any;
+  } | null>(null);
 
   const handleUploadSuccess = (uploadData: any) => {
     console.log("Upload successful on frontend, server response:", uploadData);
-    setTimeout(() => {
-      fetchVideos();
-    }, 1500);
+    setLastUploadStatus({
+      message: "Video uploaded! You can now view it in the catalog.",
+      data: uploadData,
+    });
+    // No need to fetchVideos here, as that's on the catalog page.
+    // User will navigate to see the updated catalog.
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-4 py-8 space-y-12">
-        <header className="text-center py-8">
-          <h1 className="text-5xl font-extrabold tracking-tight mb-3 bg-clip-text text-transparent bg-gradient-to-r from-primary via-red-500 to-secondary">
+      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8 space-y-12">
+        <header className="text-center py-6 sm:py-8">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-2 sm:mb-3 bg-clip-text text-transparent bg-gradient-to-r from-primary via-red-500 to-secondary">
             UALFlix 🎬
           </h1>
-          <p className="text-xl text-muted-foreground">
-            Your Personal Micro-Streaming Platform
+          <p className="text-lg sm:text-xl text-muted-foreground">
+            Upload Your Videos
           </p>
         </header>
 
-        <section className="max-w-2xl mx-auto">
+        <section className="max-w-2xl mx-auto bg-card shadow-xl rounded-lg p-6">
           <VideoUploadForm onUploadSuccess={handleUploadSuccess} />
-        </section>
-
-        <section>
-          <h2 className="text-3xl font-semibold mb-6 pb-2 border-b border-border">
-            Video Catalog
-          </h2>
-          {isLoadingVideos && (
-            <p className="text-center text-muted-foreground py-4">
-              Loading videos...
-            </p>
-          )}
-          {fetchError && (
-            <p className="text-center text-destructive py-4">
-              Error: {fetchError}
-            </p>
-          )}
-          {!isLoadingVideos && !fetchError && videos.length === 0 && (
-            <p className="text-center text-muted-foreground py-4">
-              No videos available yet. Try uploading one!
-            </p>
-          )}
-          {!isLoadingVideos && !fetchError && videos.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {videos.map((video) => (
-                <Card
-                  key={video._id}
-                  className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300"
+          {lastUploadStatus && (
+            <div className="mt-6 p-4 bg-green-100 text-green-700 border border-green-200 rounded-md">
+              <p className="font-semibold">Upload Complete!</p>
+              <p>{lastUploadStatus.message}</p>
+              <Link href="/catalog" passHref className="mt-2 inline-block">
+                <Button
+                  variant="link"
+                  className="text-green-700 hover:text-green-800"
                 >
-                  <div className="aspect-video bg-muted flex items-center justify-center">
-                    {video.video_access_url ? (
-                      <video
-                        controls
-                        className="w-full h-full object-cover"
-                        preload="metadata"
-                      >
-                        <source src={video.video_access_url} type="video/mp4" />
-                        Your browser does not support the video tag.
-                      </video>
-                    ) : (
-                      <div className="p-4 text-sm text-destructive-foreground bg-destructive rounded-t-lg">
-                        Video URL not available.
-                      </div>
-                    )}
-                  </div>
-                  <CardHeader className="p-4">
-                    <CardTitle className="text-lg truncate" title={video.title}>
-                      {video.title}
-                    </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground">
-                      {video.genre && (
-                        <span className="mr-2">{video.genre}</span>
-                      )}
-                      {video.timestamp &&
-                        `Uploaded: ${new Date(
-                          video.timestamp
-                        ).toLocaleDateString()}`}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0">
-                    <p className="text-sm text-foreground/80 line-clamp-3 leading-relaxed">
-                      {video.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+                  Go to Catalog
+                </Button>
+              </Link>
             </div>
           )}
         </section>
+
+        <div className="text-center mt-8">
+          <Link href="/catalog" passHref>
+            <Button size="lg">
+              <Video className="mr-2 h-5 w-5" /> View Video Catalog
+            </Button>
+          </Link>
+        </div>
+
         <footer className="text-center py-8 mt-12 border-t border-border">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} UFlix KekW
+            &copy; {new Date().getFullYear()} UALFlix. Project for Advanced
+            Systems Architecture.
           </p>
         </footer>
       </div>
