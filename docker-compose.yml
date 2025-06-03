@@ -1,31 +1,71 @@
 services:
-  mongo:
+  # Primary database
+  mongo_primary:
     image: mongo:latest
     ports:
-      - "27017:27017" # Esta porta é default
+      - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - mongo_primary_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=ualflix
     networks:
       - ualflix_net
+    restart: unless-stopped
 
+  # Replica database (to demonstrate replication)
+  mongo_replica:
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_replica_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=ualflix
+    networks:
+      - ualflix_net
+    restart: unless-stopped
+
+  # Redis for popular videos cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ualflix_net
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Catalog Service with replication
   catalog:
     build: ./catalog-service
     ports:
       - "5001:5000"
     depends_on:
-      - mongo
+      - mongo_primary
+      - mongo_replica
+      - redis
     environment:
-      - MONGO_URI=mongodb://mongo:27017/ualflix
+      - MONGO_URI=mongodb://mongo_primary:27017/ualflix
+      - MONGO_PRIMARY_URI=mongodb://mongo_primary:27017/ualflix
+      - MONGO_REPLICA_URI=mongodb://mongo_replica:27017/ualflix
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     networks:
       - ualflix_net
+    restart: unless-stopped
 
+  # Streaming Service
   streaming:
     build: ./streaming-service
     ports:
       - "5002:5000"
     networks:
       - ualflix_net
+    restart: unless-stopped
 
+  # Upload Service
   upload:
     build: ./upload-service
     ports:
@@ -33,12 +73,16 @@ services:
     volumes:
       - ./upload-service/uploads_data:/app/uploads_data
     depends_on:
-      - mongo
+      - mongo_primary
+      - catalog
     environment:
-      - MONGO_URI=mongodb://mongo:27017/ualflix
+      - MONGO_URI=mongodb://mongo_primary:27017/ualflix
+      - CATALOG_SERVICE_URL=http://catalog:5000/videos
     networks:
       - ualflix_net
+    restart: unless-stopped
 
+  # Admin Service
   admin:
     build: ./admin-service
     ports:
@@ -47,7 +91,9 @@ services:
       - catalog
     networks:
       - ualflix_net
+    restart: unless-stopped
 
+  # NGINX Reverse Proxy
   nginx:
     image: nginx:latest
     ports:
@@ -62,7 +108,9 @@ services:
       - admin
     networks:
       - ualflix_net
+    restart: unless-stopped
 
+  # Frontend
   frontend:
     build: ./frontend
     ports:
@@ -75,10 +123,57 @@ services:
       - nginx
     networks:
       - ualflix_net
+    restart: unless-stopped
+
+  # MONITORING SERVICE (Optional)
+  redis_commander:
+    image: rediscommander/redis-commander:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - ualflix_net
+    restart: unless-stopped
+
+  # MONGO EXPRESS to visualize data (Optional)
+  mongo_express_primary:
+    image: mongo-express:latest
+    ports:
+      - "8082:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo_primary
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin123
+    depends_on:
+      - mongo_primary
+    networks:
+      - ualflix_net
+    restart: unless-stopped
+
+  mongo_express_replica:
+    image: mongo-express:latest
+    ports:
+      - "8083:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo_replica
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin123
+    depends_on:
+      - mongo_replica
+    networks:
+      - ualflix_net
+    restart: unless-stopped
 
 volumes:
   upload_data:
-  mongo_data:
+  mongo_primary_data:
+  mongo_replica_data:
+  redis_data:
 
 networks:
   ualflix_net:
