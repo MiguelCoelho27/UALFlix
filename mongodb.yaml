@@ -1,0 +1,196 @@
+# MongoDB Replica Set Configuration
+# Dedicated YAML for MongoDB cluster deployment
+
+---
+# Secret for MongoDB keyfile authentication between replica set members
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-keyfile
+  namespace: default
+type: Opaque
+data:
+  # Base64 encoded: "ualflix_replica_set_key_2025"
+  keyfile: dWFsZmxpeF9yZXBsaWNhX3NldF9rZXlfMjAyNQ==
+
+---
+# Headless service for MongoDB StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: default
+  labels:
+    app: mongodb
+    tier: database
+spec:
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongodb
+  clusterIP: None # Headless service for StatefulSet DNS
+  selector:
+    app: mongodb
+
+---
+# MongoDB StatefulSet with 3 replicas (1 Primary + 2 Secondary)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: default
+  labels:
+    app: mongodb
+    tier: database
+spec:
+  serviceName: "mongodb-service"
+  replicas: 3 # Primary + 2 Secondaries for high availability
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        tier: database
+    spec:
+      # Security context for MongoDB
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+              name: mongodb
+
+          # Environment variables for MongoDB initialization
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: "ualflix_admin"
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              value: "ualflix_password"
+            - name: MONGO_INITDB_DATABASE
+              value: "ualflix"
+
+          # MongoDB startup command with replica set configuration
+          command:
+            - "mongod"
+          args:
+            - "--replSet"
+            - "ualflix-rs"
+            - "--auth"
+            - "--keyFile"
+            - "/etc/mongodb-keyfile/keyfile"
+            - "--bind_ip_all"
+            - "--wiredTigerCacheSizeGB"
+            - "0.5" # Limit cache size for resource-constrained environments
+
+          # Volume mounts for data persistence and authentication
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+            - name: mongodb-keyfile
+              mountPath: /etc/mongodb-keyfile
+              readOnly: true
+
+          # Resource limits and requests
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          # Liveness and readiness probes
+          livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 6
+
+          readinessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+
+      # Volumes definition
+      volumes:
+        - name: mongodb-keyfile
+          secret:
+            secretName: mongodb-keyfile
+            defaultMode: 0400 # Read-only for owner
+
+  # Persistent volume claims for each MongoDB replica
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "standard" # Use default storage class
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+# ConfigMap for MongoDB initialization script (optional)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-init-script
+  namespace: default
+data:
+  init-replica-set.js: |
+    // MongoDB Replica Set Initialization Script
+    // This script can be used to initialize the replica set automatically
+
+    // Wait for all members to be available
+    sleep(10000);
+
+    // Initialize replica set
+    rs.initiate({
+      _id: "ualflix-rs",
+      members: [
+        { _id: 0, host: "mongodb-0.mongodb-service:27017", priority: 2 },
+        { _id: 1, host: "mongodb-1.mongodb-service:27017", priority: 1 },
+        { _id: 2, host: "mongodb-2.mongodb-service:27017", priority: 1 }
+      ]
+    });
+
+    // Wait for replica set to be ready
+    while (!rs.isMaster().ismaster) {
+      sleep(1000);
+    }
+
+    print("Replica set initialized successfully!");
+
+    // Create application database and user
+    use ualflix;
+
+    db.createUser({
+      user: "ualflix_app_user",
+      pwd: "ualflix_app_password",
+      roles: [
+        { role: "readWrite", db: "ualflix" },
+        { role: "dbAdmin", db: "ualflix" }
+      ]
+    });
+
+    print("Application user created successfully!");

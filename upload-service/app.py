@@ -23,7 +23,7 @@ app.config['UPLOAD_FOLDER'] = VIDEO_FILES_PATH
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024 
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/ualflix")
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://ualflix_admin:ualflix_password@mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin")
 client = MongoClient(MONGO_URI)
 db = client.get_database()
 uploads_metadata_collection = db["uploads_metadata"]
@@ -86,7 +86,7 @@ def upload_video_file():
             inserted_id_str = str(result.inserted_id)
             
             # --- Notify Catalog Service ---
-            catalog_service_url = os.environ.get("CATALOG_SERVICE_URL", "http://catalog:5000/videos")
+            catalog_service_url = os.environ.get("CATALOG_SERVICE_URL", "http://catalog-service:5000/videos")
             duration_seconds = 0 
             
             catalog_payload = {
