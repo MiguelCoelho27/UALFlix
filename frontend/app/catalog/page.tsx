@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; // Removed useRef, useCallback for now
 import Link from "next/link";
 import {
   Card,
@@ -18,7 +18,7 @@ interface Video {
   description: string;
   genre?: string;
   duration?: number;
-  video_access_url: string;
+  video_url: string; // This should be the correct URL like /static_videos/filename.mp4
   views?: number;
   timestamp?: string;
 }
@@ -27,6 +27,7 @@ export default function CatalogPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  // Removed posterUrls state and videosBeingProcessed ref
 
   const fetchVideos = async () => {
     setIsLoadingVideos(true);
@@ -34,7 +35,7 @@ export default function CatalogPage() {
     try {
       const catalogApiUrl =
         process.env.NEXT_PUBLIC_CATALOG_API_URL ||
-        "http://localhost:5001/videos";
+        "http://localhost:5001/videos"; // Ensure this points to your NGINX proxied API in deployed env
       const res = await fetch(catalogApiUrl);
 
       if (!res.ok) {
@@ -46,13 +47,23 @@ export default function CatalogPage() {
             `Failed to fetch videos: ${res.status} ${res.statusText}`
         );
       }
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setVideos(data);
+      const responseData = await res.json();
+      if (responseData && Array.isArray(responseData.videos)) {
+        setVideos(responseData.videos);
+      } else if (Array.isArray(responseData)) {
+        setVideos(responseData);
+        console.warn(
+          "Catalog API returned a direct array, but expected an object with a 'videos' property."
+        );
       } else {
-        console.warn("Received non-array data from catalog API:", data);
+        console.warn(
+          "Received unexpected data format from catalog API:",
+          responseData
+        );
         setVideos([]);
-        setFetchError("Received unexpected data format from catalog service.");
+        setFetchError(
+          "Received unexpected data format. Expected an object with a 'videos' array."
+        );
       }
     } catch (err: any) {
       console.error("Error fetching videos:", err);
@@ -68,6 +79,8 @@ export default function CatalogPage() {
   useEffect(() => {
     fetchVideos();
   }, []);
+
+  // Removed generatePosterForVideo function and its related useEffect
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -116,37 +129,34 @@ export default function CatalogPage() {
               <p>Try uploading some videos first!</p>
             </div>
           )}
+
           {!isLoadingVideos && !fetchError && videos.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {videos.map((video) => (
                 <Card
-                  key={video._id}
+                  key={video._id} // Stable key is important
                   className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col bg-card"
                 >
-                  <div className="aspect-video bg-muted flex items-center justify-center relative">
-                    {video.video_access_url ? (
+                  <div className="aspect-video bg-black flex items-center justify-center relative">
+                    {" "}
+                    {/* Changed background to black */}
+                    {video.video_url ? (
                       <video
                         controls
                         className="w-full h-full object-cover"
-                        preload="metadata"
-                        poster={`https://placehold.co/600x400/222/fff?text=${encodeURIComponent(
-                          video.title
-                        )}`}
+                        preload="auto" // Changed to "auto" to encourage more loading
+                        // No poster attribute for now
                       >
-                        <source src={video.video_access_url} type="video/mp4" />
-                        <source
-                          src={video.video_access_url.replace(".mp4", ".webm")}
-                          type="video/webm"
-                        />
-                        <source
-                          src={video.video_access_url.replace(".mp4", ".ogv")}
-                          type="video/ogg"
-                        />
+                        <source src={video.video_url} type="video/mp4" />
+                        {/* You can add other sources if you have different formats */}
+                        {/* <source src={video.video_url.replace('.mp4', '.webm')} type="video/webm" /> */}
                         Your browser does not support the video tag.
                       </video>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm text-destructive-foreground bg-destructive">
-                        Video URL not available.
+                      <div className="w-full h-full flex items-center justify-center text-sm text-white bg-red-700">
+                        {" "}
+                        {/* Adjusted error display */}
+                        Video URL was not provided for this item.
                       </div>
                     )}
                   </div>

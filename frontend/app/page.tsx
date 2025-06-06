@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react"; // No longer need useEffect or fetchVideos here
-import Link from "next/link"; // For navigation
+import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { VideoUploadForm } from "../components/video-upload-form"; // Ensure this path is correct
-import { Video } from "lucide-react"; // Icon for catalog button
-
-// Video interface might not be needed on this page if not displaying catalog here
-// interface Video { ... }
+import { VideoUploadForm } from "../components/video-upload-form";
+import { Video } from "lucide-react";
 
 export default function UploadPage() {
-  // State for videos, isLoadingVideos, fetchError is removed as catalog is on a separate page.
-
   const [lastUploadStatus, setLastUploadStatus] = useState<{
     message: string;
     data: any;
@@ -23,8 +18,6 @@ export default function UploadPage() {
       message: "Video uploaded! You can now view it in the catalog.",
       data: uploadData,
     });
-    // No need to fetchVideos here, as that's on the catalog page.
-    // User will navigate to see the updated catalog.
   };
 
   return (
