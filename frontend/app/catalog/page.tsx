@@ -18,7 +18,7 @@ interface Video {
   description: string;
   genre?: string;
   duration?: number;
-  video_access_url: string;
+  video_url: string;
   views?: number;
   timestamp?: string;
 }
@@ -46,13 +46,23 @@ export default function CatalogPage() {
             `Failed to fetch videos: ${res.status} ${res.statusText}`
         );
       }
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setVideos(data);
+      const responseData = await res.json();
+      if (responseData && Array.isArray(responseData.videos)) {
+        setVideos(responseData.videos);
+      } else if (Array.isArray(responseData)) {
+        setVideos(responseData);
+        console.warn(
+          "Catalog API returned a direct array, but expected an object with a 'videos' property."
+        );
       } else {
-        console.warn("Received non-array data from catalog API:", data);
+        console.warn(
+          "Received unexpected data format from catalog API:",
+          responseData
+        );
         setVideos([]);
-        setFetchError("Received unexpected data format from catalog service.");
+        setFetchError(
+          "Received unexpected data format. Expected an object with a 'videos' array."
+        );
       }
     } catch (err: any) {
       console.error("Error fetching videos:", err);
@@ -81,7 +91,7 @@ export default function CatalogPage() {
               Browse available videos.
             </p>
           </div>
-          <Link href="/" passHref>
+          <Link href="/upload" passHref>
             <Button variant="outline" className="mt-4 sm:mt-0">
               <ArrowLeft className="mr-2 h-4 w-4" /> Go to Upload Page
             </Button>
@@ -116,6 +126,7 @@ export default function CatalogPage() {
               <p>Try uploading some videos first!</p>
             </div>
           )}
+
           {!isLoadingVideos && !fetchError && videos.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {videos.map((video) => (
@@ -123,30 +134,22 @@ export default function CatalogPage() {
                   key={video._id}
                   className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col bg-card"
                 >
-                  <div className="aspect-video bg-muted flex items-center justify-center relative">
-                    {video.video_access_url ? (
+                  <div className="aspect-video bg-black flex items-center justify-center relative">
+                    {" "}
+                    {}
+                    {video.video_url ? (
                       <video
                         controls
                         className="w-full h-full object-cover"
-                        preload="metadata"
-                        poster={`https://placehold.co/600x400/222/fff?text=${encodeURIComponent(
-                          video.title
-                        )}`}
+                        preload="auto"
                       >
-                        <source src={video.video_access_url} type="video/mp4" />
-                        <source
-                          src={video.video_access_url.replace(".mp4", ".webm")}
-                          type="video/webm"
-                        />
-                        <source
-                          src={video.video_access_url.replace(".mp4", ".ogv")}
-                          type="video/ogg"
-                        />
+                        <source src={video.video_url} type="video/mp4" />
                         Your browser does not support the video tag.
                       </video>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm text-destructive-foreground bg-destructive">
-                        Video URL not available.
+                      <div className="w-full h-full flex items-center justify-center text-sm text-white bg-red-700">
+                        {" "}
+                        Video URL was not provided for this item.
                       </div>
                     )}
                   </div>
