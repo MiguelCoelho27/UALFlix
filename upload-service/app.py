@@ -23,7 +23,7 @@ app.config['UPLOAD_FOLDER'] = VIDEO_FILES_PATH
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024 
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/ualflix")
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://ualflix_admin:ualflix_password@mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin")
 client = MongoClient(MONGO_URI)
 db = client.get_database()
 uploads_metadata_collection = db["uploads_metadata"]
@@ -85,8 +85,8 @@ def upload_video_file():
             result = uploads_metadata_collection.insert_one(upload_metadata_entry)
             inserted_id_str = str(result.inserted_id)
             
-            # --- Notify Catalog Service ---
-            catalog_service_url = os.environ.get("CATALOG_SERVICE_URL", "http://catalog:5000/videos")
+            # Notificar o catalog-service
+            catalog_service_url = os.environ.get("CATALOG_SERVICE_URL", "http://catalog-service:5000/videos")
             duration_seconds = 0 
             
             catalog_payload = {
@@ -104,12 +104,7 @@ def upload_video_file():
                 logger.info(f"Successfully notified catalog service for video: {title}. Response: {response.json()}")
             except requests.exceptions.RequestException as e:
                 logger.error(f"Failed to notify catalog service for video '{title}': {e}")
-                # Decide on error handling:
-                # - Retry logic?
-                # - Mark upload metadata as "pending_catalog_registration"?
-                # - For now, the upload is successful, but catalog won't know.
-                # You might want to return a different message to the user or log this for manual intervention.
-                pass # Continue, but log the failure
+                pass 
 
             return jsonify({
                 "message": f"File '{original_filename}' uploaded successfully as '{stored_filename}'. Catalog notification attempted.", 
