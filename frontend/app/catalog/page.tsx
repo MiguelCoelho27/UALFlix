@@ -91,7 +91,7 @@ export default function CatalogPage() {
               Browse available videos.
             </p>
           </div>
-          <Link href="/" passHref>
+          <Link href="/upload" passHref>
             <Button variant="outline" className="mt-4 sm:mt-0">
               <ArrowLeft className="mr-2 h-4 w-4" /> Go to Upload Page
             </Button>
