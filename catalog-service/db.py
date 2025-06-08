@@ -4,7 +4,6 @@ import os
 import logging
 from replication import replication_manager
 
-# Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ def get_video_by_id(video_id, use_cache=True):
 def get_all_videos(use_cache=True):
     """Get all videos with intelligent cache support"""
     try:
-        # First, try to get popular videos from cache
+        # get popular videos from cache
         if use_cache:
             popular_videos = replication_manager.get_popular_videos(limit=20)
             
@@ -95,7 +94,7 @@ def get_all_videos(use_cache=True):
                         video["_id"] = video_id
                         popular_videos.append(video)
                 
-                return popular_videos[:30]  # Maximum 30 videos
+                return popular_videos[:30]  
         
         # Fallback: direct search in database
         videos = []
@@ -113,7 +112,6 @@ def get_all_videos(use_cache=True):
 def increment_view_count(video_id):
     """Increment view counter with replication and cache"""
     try:
-        # Use the replication manager directly for views
         success = replication_manager.increment_views(video_id)
         
         if success:

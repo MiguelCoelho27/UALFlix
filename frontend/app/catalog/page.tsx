@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react"; // Removed useRef, useCallback for now
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -18,7 +18,7 @@ interface Video {
   description: string;
   genre?: string;
   duration?: number;
-  video_url: string; // This should be the correct URL like /static_videos/filename.mp4
+  video_url: string;
   views?: number;
   timestamp?: string;
 }
@@ -27,7 +27,6 @@ export default function CatalogPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // Removed posterUrls state and videosBeingProcessed ref
 
   const fetchVideos = async () => {
     setIsLoadingVideos(true);
@@ -35,7 +34,7 @@ export default function CatalogPage() {
     try {
       const catalogApiUrl =
         process.env.NEXT_PUBLIC_CATALOG_API_URL ||
-        "http://localhost:5001/videos"; // Ensure this points to your NGINX proxied API in deployed env
+        "http://localhost:5001/videos";
       const res = await fetch(catalogApiUrl);
 
       if (!res.ok) {
@@ -79,8 +78,6 @@ export default function CatalogPage() {
   useEffect(() => {
     fetchVideos();
   }, []);
-
-  // Removed generatePosterForVideo function and its related useEffect
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -134,28 +131,24 @@ export default function CatalogPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {videos.map((video) => (
                 <Card
-                  key={video._id} // Stable key is important
+                  key={video._id}
                   className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col bg-card"
                 >
                   <div className="aspect-video bg-black flex items-center justify-center relative">
                     {" "}
-                    {/* Changed background to black */}
+                    {}
                     {video.video_url ? (
                       <video
                         controls
                         className="w-full h-full object-cover"
-                        preload="auto" // Changed to "auto" to encourage more loading
-                        // No poster attribute for now
+                        preload="auto"
                       >
                         <source src={video.video_url} type="video/mp4" />
-                        {/* You can add other sources if you have different formats */}
-                        {/* <source src={video.video_url.replace('.mp4', '.webm')} type="video/webm" /> */}
                         Your browser does not support the video tag.
                       </video>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-sm text-white bg-red-700">
                         {" "}
-                        {/* Adjusted error display */}
                         Video URL was not provided for this item.
                       </div>
                     )}
