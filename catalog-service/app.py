@@ -261,6 +261,32 @@ def get_video_route(video_id):
         else:
             return jsonify({"error": "Video not found"}), 404
 
+@app.route('/videos/<video_id>', methods=['PUT'])
+def update_video_route(video_id):
+    """Update the existing video's metadata"""
+    data_update = request.get_json()
+    if not data_update:
+        return jsonify({"error": "Invalid JSON data"}), 400
+    
+    success = db.update_video(video_id, data_update, use_sync_replication=True)
+    
+    if success:
+        # Return the updated video data
+        updated_video = db.get_video_by_id(video_id, use_cache=True)
+        return jsonify({"status": "success", "message": "Video updated", "video": updated_video }), 200
+    else:
+        return jsonify({"error": "Video not found or failed to update"}), 404
+    
+@app.route('/videos/<video_id>', methods=['DELETE'])
+def delete_video_route(video_id):
+    """Delete a video from the catalog"""
+    success = db.delete_video(video_id, use_sync_replication=True)
+    
+    if success:
+        return jsonify({"status": "success", "message": "Video deleted successfully"}), 200
+    else:
+        return jsonify({"error": "Video not found or failed to delete"}), 404
+
 @app.route('/videos', methods=['GET'])
 def get_videos_route():
     """Get all videos with configurable read preferences"""
