@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, ChangeEvent, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -8,25 +8,32 @@ interface AddVideoFormProps {
   onAddSuccess?: (data: any) => void;
 }
 
+// File Upload Just like in Upload Form
 export function AddVideoForm({ onAddSuccess }: AddVideoFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [genre, setGenre] = useState("");
-  const [duration, setDuration] = useState(0);
-  const [videoUrl, setVideoUrl] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setVideoFile(event.target.files[0]);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!title || !description || !videoUrl || duration <= 0) {
+    if (!videoFile || !title || !description) {
       setMessage({
         type: "error",
-        text: "Please fill in all required fields (Title, Description, Duration > 0, Video URL).",
+        text: "Please fill in title, description, and select a video file.",
       });
       return;
     }
@@ -34,24 +41,18 @@ export function AddVideoForm({ onAddSuccess }: AddVideoFormProps) {
     setIsSubmitting(true);
     setMessage(null);
 
-    const videoData = {
-      title,
-      description,
-      genre,
-      duration,
-      video_url: videoUrl, // Ensure field name matches what catalog-service expects
-    };
+    const formData = new FormData();
+    formData.append("file", videoFile);
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("genre", genre);
 
-    // The endpoint proxied by NGINX to your admin-service
-    const adminApiUrl = "/api/admin/videos";
+    const uploadApiUrl = "/api/upload";
 
     try {
-      const response = await fetch(adminApiUrl, {
+      const response = await fetch(uploadApiUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(videoData),
+        body: formData,
       });
 
       const result = await response.json();
@@ -59,14 +60,14 @@ export function AddVideoForm({ onAddSuccess }: AddVideoFormProps) {
       if (response.ok) {
         setMessage({
           type: "success",
-          text: result.message || "Video added successfully!",
+          text: result.message || "Video uploaded and added to catalog!",
         });
         // Clear form
         setTitle("");
         setDescription("");
         setGenre("");
-        setDuration(0);
-        setVideoUrl("");
+        setVideoFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
 
         if (onAddSuccess) {
           onAddSuccess(result);
@@ -74,15 +75,12 @@ export function AddVideoForm({ onAddSuccess }: AddVideoFormProps) {
       } else {
         setMessage({
           type: "error",
-          text: result.error || "Failed to add video.",
+          text: result.error || "Failed to upload video.",
         });
       }
     } catch (error) {
       console.error("Submit error:", error);
-      setMessage({
-        type: "error",
-        text: "An unexpected error occurred. Please try again.",
-      });
+      setMessage({ type: "error", text: "An unexpected error occurred." });
     } finally {
       setIsSubmitting(false);
     }
@@ -94,7 +92,7 @@ export function AddVideoForm({ onAddSuccess }: AddVideoFormProps) {
       className="space-y-4 p-6 border rounded-lg shadow-md bg-card"
     >
       <h2 className="text-xl font-semibold text-card-foreground">
-        Add New Video to Catalog
+        Add New Video by Uploading
       </h2>
 
       <div>
@@ -135,59 +133,46 @@ export function AddVideoForm({ onAddSuccess }: AddVideoFormProps) {
 
       <div>
         <label
-          htmlFor="videoUrl"
+          htmlFor="genre"
           className="block text-sm font-medium text-foreground/80"
         >
-          Video URL
+          Genre (Optional)
         </label>
         <Input
-          id="videoUrl"
+          id="genre"
           type="text"
-          value={videoUrl}
-          onChange={(e) => setVideoUrl(e.target.value)}
-          placeholder="e.g., /static_videos/example.mp4"
-          required
+          value={genre}
+          onChange={(e) => setGenre(e.target.value)}
+          placeholder="e.g., Action"
           className="mt-1 bg-background"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label
-            htmlFor="duration"
-            className="block text-sm font-medium text-foreground/80"
-          >
-            Duration (seconds)
-          </label>
-          <Input
-            id="duration"
-            type="number"
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            required
-            className="mt-1 bg-background"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="genre"
-            className="block text-sm font-medium text-foreground/80"
-          >
-            Genre (Optional)
-          </label>
-          <Input
-            id="genre"
-            type="text"
-            value={genre}
-            onChange={(e) => setGenre(e.target.value)}
-            placeholder="e.g., Action"
-            className="mt-1 bg-background"
-          />
-        </div>
+      <div>
+        <label
+          htmlFor="videoFile"
+          className="block text-sm font-medium text-foreground/80"
+        >
+          Video File
+        </label>
+        <Input
+          id="videoFile"
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept="video/mp4,video/quicktime,video/x-matroska,video/x-msvideo"
+          required
+          className="mt-1 bg-background"
+        />
+        {videoFile && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Selected: {videoFile.name}
+          </p>
+        )}
       </div>
 
       <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? "Adding..." : "Add Video"}
+        {isSubmitting ? "Uploading..." : "Upload and Add Video"}
       </Button>
 
       {message && (
