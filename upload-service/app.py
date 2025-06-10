@@ -20,7 +20,7 @@ VIDEO_FILES_SUBDIR = "videos"
 VIDEO_FILES_PATH = os.path.join(UPLOADS_FOLDER_BASE, VIDEO_FILES_SUBDIR)
 
 app.config['UPLOAD_FOLDER'] = VIDEO_FILES_PATH
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024 
+app.config['MAX_CONTENT_LENGTH'] = 120 * 1024 * 1024 
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://ualflix_admin:ualflix_password@mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin")
@@ -35,7 +35,7 @@ def allowed_file(filename):
     return '.' in filename and \
             filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/upload', methods=['POST'])
+@app.route('/', methods=['POST'])
 def upload_video_file():
     if 'file' not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
