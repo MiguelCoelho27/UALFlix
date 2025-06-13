@@ -49,7 +49,6 @@ def create_video(title, description, duration, genre, video_url, use_sync_replic
 def get_video_by_id(video_id, use_cache=True):
     """Get video by ID with cache support"""
     try:
-        # Try to get from cache first (if enabled)
         if use_cache:
             cached_video = replication_manager.get_from_cache(video_id)
             if cached_video:
@@ -61,7 +60,7 @@ def get_video_by_id(video_id, use_cache=True):
         if video:
             video["_id"] = str(video["_id"])
             
-            # Store in cache for next queries
+            # Stores in cache for next queries
             if use_cache:
                 replication_manager.set_cache(video_id, video)
             
@@ -157,35 +156,59 @@ def update_video(video_id, data_update, use_sync_replication=True):
         logger.error(f"Error updating video {video_id}: {e}")
         return False
 
+
 def delete_video(video_id, use_sync_replication=True):
-    """Delete video with replication"""
+    """
+    Deletes a video's file from the filesystem and its metadata from the
+    database, using the existing replication manager.
+    """
     try:
+        object_id = ObjectId(video_id)
+        # Find the document in the primary DB to get the file path
+        video_to_delete = videos_collection.find_one({"_id": object_id})
+        
+        if not video_to_delete:
+            logger.warning(f"Video with ID {video_id} not found. Nothing to delete.")
+            return False
+
+        video_url = video_to_delete.get("video_url")
+        if video_url:
+            video_files_path = "/app/uploads_data/videos"
+            filename = os.path.basename(video_url)
+            file_path = os.path.join(video_files_path, filename)
+            
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Successfully deleted physical video file: {file_path}")
+                except OSError as e:
+                    # Logs error but proceeds to delete the DB record anyway
+                    logger.error(f"Error deleting file {file_path}: {e}. Proceeding with DB deletion.")
+            else:
+                logger.warning(f"Video file not found at {file_path}, but deleting DB record.")
+
         if use_sync_replication:
-            # SYNCHRONOUS REPLICATION
-            success = replication_manager.replicate_sync("delete", {
-                "video_id": video_id
-            })
-            logger.info(f"Video {video_id} deleted with SYNCHRONOUS replication")
+            #  Calling sync replication to delete from both DBs
+            success = replication_manager.replicate_sync("delete", {"video_id": video_id})
+            if success:
+                logger.info(f"Video {video_id} metadata deleted with SYNCHRONOUS replication")
+            else:
+                logger.error(f"Failed to delete video {video_id} metadata with SYNCHRONOUS replication")
             return success
         else:
-            # ASYNCHRONOUS REPLICATION
-            result = videos_collection.delete_one({"_id": ObjectId(video_id)})
-            
+            # Asynchronous path
+            result = videos_collection.delete_one({"_id": object_id})
             if result.deleted_count > 0:
-                # Add to async queue
-                replication_manager.replicate_async("delete", {
-                    "video_id": video_id
-                })
-                
-                logger.info(f"Video {video_id} deleted with ASYNCHRONOUS replication")
+                replication_manager.replicate_async("delete", {"video_id": video_id})
+                logger.info(f"Video {video_id} metadata deleted with ASYNCHRONOUS replication")
                 return True
-            
+            logger.warning(f"Video {video_id} metadata not found in primary DB for async deletion.")
             return False
             
     except Exception as e:
-        logger.error(f"Error deleting video {video_id}: {e}")
+        logger.error(f"An error occurred during the deletion process for video {video_id}: {e}")
         return False
-
+    
 def get_popular_videos(limit=10):
     """Get most popular videos from cache"""
     try:
@@ -222,8 +245,8 @@ def get_replication_status():
         
     except Exception as e:
         logger.error(f"Error getting replication status: {e}")
-        return {"error": str(e)}
-
+        return {"error": str(e)} 
+    
 # Initialize asynchronous replication worker
 def initialize_replication():
     """Initialize replication system"""

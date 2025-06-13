@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
   Card,
   CardContent,
+  CardFooter,
   CardHeader,
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 
 interface Video {
   _id: string;
@@ -28,48 +29,26 @@ export default function CatalogPage() {
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Tracking videos that have been played but not finished
+  const viewedVideos = useRef(new Set());
+
   const fetchVideos = async () => {
     setIsLoadingVideos(true);
     setFetchError(null);
     try {
       const catalogApiUrl =
         process.env.NEXT_PUBLIC_CATALOG_API_URL ||
-        "http://localhost:5001/videos";
-      const res = await fetch(catalogApiUrl);
+        "http://localhost/api/catalog";
+      const res = await fetch(`${catalogApiUrl}/videos`);
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({
-          error: "Failed to parse error response from catalog",
-        }));
-        throw new Error(
-          errorData.error ||
-            `Failed to fetch videos: ${res.status} ${res.statusText}`
-        );
+        throw new Error("Failed to parse error response from catalog");
       }
       const responseData = await res.json();
-      if (responseData && Array.isArray(responseData.videos)) {
-        setVideos(responseData.videos);
-      } else if (Array.isArray(responseData)) {
-        setVideos(responseData);
-        console.warn(
-          "Catalog API returned a direct array, but expected an object with a 'videos' property."
-        );
-      } else {
-        console.warn(
-          "Received unexpected data format from catalog API:",
-          responseData
-        );
-        setVideos([]);
-        setFetchError(
-          "Received unexpected data format. Expected an object with a 'videos' array."
-        );
-      }
+      setVideos(responseData.videos || []);
     } catch (err: any) {
       console.error("Error fetching videos:", err);
-      setFetchError(
-        err.message || "An unknown error occurred while fetching videos."
-      );
-      setVideos([]);
+      setFetchError(err.message || "An unknown error occurred.");
     } finally {
       setIsLoadingVideos(false);
     }
@@ -78,6 +57,35 @@ export default function CatalogPage() {
   useEffect(() => {
     fetchVideos();
   }, []);
+
+  const handlePlay = async (video: Video) => {
+    if (viewedVideos.current.has(video._id)) {
+      return;
+    }
+    try {
+      const catalogApiUrl =
+        process.env.NEXT_PUBLIC_CATALOG_API_URL ||
+        "http://localhost/api/catalog";
+      await fetch(`${catalogApiUrl}/videos/${video._id}/view`, {
+        method: "POST",
+      });
+      viewedVideos.current.add(video._id);
+      setVideos((currentVideos) =>
+        currentVideos.map((v) =>
+          v._id === video._id ? { ...v, views: (v.views || 0) + 1 } : v
+        )
+      );
+    } catch (error) {
+      console.error("Failed to increment view count:", error);
+    }
+  };
+
+  // This function is called when a video finishes playing.
+  const handleEnded = (videoId: string) => {
+    // Remove the video from "viewed" allowing it to be counted again on the next play.
+    viewedVideos.current.delete(videoId);
+    console.log(`Video ${videoId} finished. Ready to count next view.`);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -135,48 +143,38 @@ export default function CatalogPage() {
                   className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col bg-card"
                 >
                   <div className="aspect-video bg-black flex items-center justify-center relative">
-                    {" "}
-                    {}
-                    {video.video_url ? (
-                      <video
-                        controls
-                        className="w-full h-full object-cover"
-                        preload="auto"
-                      >
-                        <source src={video.video_url} type="video/mp4" />
-                        Your browser does not support the video tag.
-                      </video>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm text-white bg-red-700">
-                        {" "}
-                        Video URL was not provided for this item.
-                      </div>
-                    )}
-                  </div>
-                  <CardHeader className="p-4">
-                    <CardTitle
-                      className="text-lg truncate hover:text-primary transition-colors"
-                      title={video.title}
+                    <video
+                      controls
+                      className="w-full h-full object-cover"
+                      preload="metadata"
+                      onPlay={() => handlePlay(video)}
+                      onEnded={() => handleEnded(video._id)} // <-- ADD THIS EVENT HANDLER
                     >
-                      {video.title}
-                    </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground mt-1">
-                      {video.genre && (
-                        <span className="inline-block bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full mr-2">
-                          {video.genre}
-                        </span>
-                      )}
-                      {video.timestamp &&
-                        `Uploaded: ${new Date(
-                          video.timestamp
-                        ).toLocaleDateString()}`}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0 flex-grow">
-                    <p className="text-sm text-foreground/80 line-clamp-3 leading-relaxed">
-                      {video.description}
-                    </p>
-                  </CardContent>
+                      <source src={video.video_url} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                  <div className="flex flex-col flex-grow">
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-lg truncate">
+                        {video.title}
+                      </CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground mt-1">
+                        {video.genre}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0 flex-grow">
+                      <p className="text-sm text-foreground/80 line-clamp-3">
+                        {video.description}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0">
+                      <div className="flex items-center text-xs text-muted-foreground">
+                        <Eye className="mr-1.5 h-4 w-4" />
+                        {video.views || 0} views
+                      </div>
+                    </CardFooter>
+                  </div>
                 </Card>
               ))}
             </div>

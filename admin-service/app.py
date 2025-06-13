@@ -1,7 +1,9 @@
 from flask import Flask, Response, request
 import requests
+from prometheus_flask_exporter import PrometheusMetrics
 
 app = Flask(__name__)
+metrics = PrometheusMetrics(app)
 CATALOG_SERVICE_URL = "http://catalog:5000/videos"
 
 @app.route("/videos", methods=['GET', 'POST'])

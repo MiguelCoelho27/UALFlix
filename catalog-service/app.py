@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from prometheus_flask_exporter import PrometheusMetrics
 from pymongo import MongoClient, ReadPreference
 from bson import ObjectId
 import os
@@ -8,13 +9,13 @@ import time
 import json
 
 app = Flask(__name__)
+metrics = PrometheusMetrics(app)
 CORS(app)
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Detect implementation type based on MongoDB URI
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongo_primary:27017/ualflix")
 USE_NATIVE_REPLICA_SET = "replicaSet=" in MONGO_URI
 
@@ -99,8 +100,8 @@ def update_popularity_cache(video_id: str, views: int = 0):
         return
     try:
         redis_client.zadd(POPULAR_VIDEOS_KEY, {video_id: views})
-        # Keep only top 50 popular videos
-        redis_client.zremrangebyrank(POPULAR_VIDEOS_KEY, 0, -51)
+        # Keep only top 20 popular videos
+        redis_client.zremrangebyrank(POPULAR_VIDEOS_KEY, 0, -21)
         logger.info(f"Video {video_id} added to popularity ranking")
     except Exception as e:
         logger.error(f"Popularity cache error: {e}")
@@ -133,7 +134,6 @@ def create_video_route():
             "views": 0
         }
         
-        # Choose write concern based on strategy
         write_concern = {"w": "majority", "j": True} if use_sync else {"w": 1}
         
         try:
@@ -286,6 +286,16 @@ def delete_video_route(video_id):
         return jsonify({"status": "success", "message": "Video deleted successfully"}), 200
     else:
         return jsonify({"error": "Video not found or failed to delete"}), 404
+    
+@app.route('/videos/<video_id>/view', methods=['POST'])
+def increment_video_view(video_id):
+    """Increment the view count for a specific video."""
+    success = db.increment_view_count(video_id)
+    if success:
+        return jsonify({"status": "success", "message": "View count incremented."}), 200
+    else:
+        # This could happen if the video_id is not found
+        return jsonify({"error": "Failed to increment view count."}), 404
 
 @app.route('/videos', methods=['GET'])
 def get_videos_route():
@@ -391,6 +401,7 @@ def increment_view_route(video_id):
             }), 200
         else:
             return jsonify({"error": "Video not found or failed to increment view count"}), 404
+
 
 @app.route('/videos/popular', methods=['GET'])
 def get_popular_videos_route():

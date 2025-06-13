@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "catalog-service"
+    static_configs:
+      - targets: ["catalog:5000"]
+  - job_name: "admin-service"
+    static_configs:
+      - targets: ["admin:5000"]
+  - job_name: "upload-service"
+    static_configs:
+      - targets: ["upload:5000"]
+  - job_name: "streaming-service"
+    static_configs:
+      - targets: ["streaming:5000"]

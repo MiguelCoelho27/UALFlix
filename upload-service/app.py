@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from prometheus_flask_exporter import PrometheusMetrics
 from werkzeug.utils import secure_filename 
 import os
 from datetime import datetime
@@ -9,6 +10,7 @@ import requests
 import logging # adicionado para perceber uns problemas 
 
 app = Flask(__name__)
+metrics = PrometheusMetrics(app)
 CORS(app)
 
 # logs basics

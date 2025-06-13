@@ -40,7 +40,7 @@ export function VideoUploadForm({ onUploadSuccess }: VideoUploadFormProps) {
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
-      const maxSize = 50 * 1024 * 1024;
+      const maxSize = 120 * 1024 * 1024;
       if (selectedFile.size > maxSize) {
         setMessage({
           type: "error",

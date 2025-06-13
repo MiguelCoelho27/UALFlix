@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
+from prometheus_flask_exporter import PrometheusMetrics 
 
 app = Flask(__name__)
+metrics = PrometheusMetrics(app)
 
 # Simulação de base de dados em memória
 streaming_sessions = []
