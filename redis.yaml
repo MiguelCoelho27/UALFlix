@@ -114,15 +114,15 @@ spec:
           # Use custom Redis configuration
           command:
             - "redis-server"
-            - "/etc/redis/redis.conf"
+            # - "/etc/redis/redis.conf"
 
           # Volume mounts for data and configuration
-          volumeMounts:
-            - name: redis-data
-              mountPath: /data
-            - name: redis-config
-              mountPath: /etc/redis
-              readOnly: true
+          #volumeMounts:
+          #  - name: redis-data
+          #    mountPath: /data
+          #  - name: redis-config
+          #    mountPath: /etc/redis
+          #    readOnly: true
 
           # Resource limits and requests
           resources:
@@ -163,16 +163,16 @@ spec:
               value: "6379"
 
       # Volumes definition
-      volumes:
-        - name: redis-data
-          persistentVolumeClaim:
-            claimName: redis-pvc
-        - name: redis-config
-          configMap:
-            name: redis-config
-            items:
-              - key: redis.conf
-                path: redis.conf
+      #volumes:
+      #  - name: redis-data
+      #    persistentVolumeClaim:
+      #      claimName: redis-pvc
+      #  - name: redis-config
+      #    configMap:
+      #      name: redis-config
+      #      items:
+      #        - key: redis.conf
+      #          path: redis.conf
 
 ---
 # Optional: Redis monitoring service (for debugging)

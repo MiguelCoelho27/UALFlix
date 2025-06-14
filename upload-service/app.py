@@ -67,7 +67,7 @@ def upload_video_file():
             return jsonify({"error": f"Server error: Could not save file. {str(e)}"}), 500
 
         
-        video_access_url = f"/static_videos/{stored_filename}" 
+        video_access_url = f"/api/streaming/stream/{stored_filename}" 
 
         upload_metadata_entry = {
             "original_filename": original_filename,

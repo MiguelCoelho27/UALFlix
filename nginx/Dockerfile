@@ -1,2 +1,6 @@
-FROM nginx:alpine
-COPY nginx.conf /etc/nginx/nginx.conf
+# Use the official stable NGINX image
+FROM nginx:latest
+
+RUN rm /etc/nginx/conf.d/default.conf
+
+COPY default.conf /etc/nginx/conf.d/default.conf

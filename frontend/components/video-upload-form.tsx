@@ -76,8 +76,7 @@ export function VideoUploadForm({ onUploadSuccess }: VideoUploadFormProps) {
     formData.append("description", description);
     formData.append("genre", genre);
 
-    const uploadApiUrl =
-      process.env.NEXT_PUBLIC_UPLOAD_API_URL || "http://localhost:5003/upload";
+    const uploadApiUrl = "/api/upload";
 
     try {
       const response = await fetch(uploadApiUrl, {

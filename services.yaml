@@ -1,9 +1,8 @@
-# UALFlix Application Services
-# Kubernetes deployment for UALFlix microservices
+# UALFlix Application Services - FINAL CORRECTED VERSION
 # Dependencies: mongodb.yaml and redis.yaml must be deployed first
 
 ---
-# Catalog Service - Main service with replication
+# Catalog Service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,7 +10,7 @@ metadata:
   labels:
     app: catalog-service
 spec:
-  replicas: 2 # Service replicas for high availability
+  replicas: 2
   selector:
     matchLabels:
       app: catalog-service
@@ -22,7 +21,8 @@ spec:
     spec:
       containers:
         - name: catalog
-          image: ualflix/catalog:latest
+          image: iulian169/ualflix-catalog:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:
@@ -68,9 +68,14 @@ spec:
       labels:
         app: upload-service
     spec:
+      volumes:
+        - name: upload-storage
+          persistentVolumeClaim:
+            claimName: upload-pvc
       containers:
         - name: upload
-          image: ualflix/upload:latest
+          image: iulian169/ualflix-upload:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:
@@ -88,10 +93,6 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "500m"
-      volumes:
-        - name: upload-storage
-          persistentVolumeClaim:
-            claimName: upload-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -134,11 +135,20 @@ spec:
       labels:
         app: streaming-service
     spec:
+      volumes:
+        - name: upload-storage
+          persistentVolumeClaim:
+            claimName: upload-pvc
       containers:
         - name: streaming
-          image: ualflix/streaming:latest
+          image: iulian169/ualflix-streaming:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
+          volumeMounts:
+            - name: upload-storage
+              mountPath: /app/uploads_data
+              readOnly: true
           resources:
             requests:
               memory: "128Mi"
@@ -179,7 +189,8 @@ spec:
     spec:
       containers:
         - name: admin
-          image: ualflix/admin:latest
+          image: iulian169/ualflix-admin:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:
@@ -225,7 +236,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ualflix/frontend:latest
+          image: iulian169/ualflix-frontend:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           resources:
@@ -239,38 +251,46 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend-service
+  name: frontend
 spec:
   selector:
     app: frontend
   ports:
     - port: 80
       targetPort: 80
-  type: LoadBalancer # External exposure
-
+  type: ClusterIP
 ---
 # NGINX Load Balancer
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-lb
+  name: nginx-service
   labels:
-    app: nginx-lb
+    app: nginx-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nginx-lb
+      app: nginx-service
   template:
     metadata:
       labels:
-        app: nginx-lb
+        app: nginx-service
     spec:
+      volumes:
+        - name: nginx-config-volume
+          configMap:
+            name: nginx-config
       containers:
         - name: nginx
-          image: ualflix/nginx:latest
+          image: iulian169/ualflix-nginx:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
+          volumeMounts:
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
           resources:
             requests:
               memory: "64Mi"
@@ -285,8 +305,56 @@ metadata:
   name: nginx-service
 spec:
   selector:
-    app: nginx-lb
+    app: nginx-service
   ports:
     - port: 80
       targetPort: 80
   type: LoadBalancer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  default.conf: |
+    upstream catalog_backend {
+        server catalog-service:5000;
+    }
+    upstream upload_backend {
+        server upload-service:5000;
+    }
+    upstream admin_backend {
+        server admin-service:5000;
+    }
+    upstream streaming_backend {
+        server streaming-service:5000;
+    }
+    upstream frontend_backend {
+        server frontend:80;
+    }
+    server {
+        listen 80;
+        server_name _;
+        resolver 127.0.0.11 valid=10s;
+
+        client_max_body_size 120M;
+
+        location /api/catalog/ {
+            proxy_pass http://catalog_backend/;
+        }
+        location /api/upload {
+            proxy_pass http://upload_backend/;
+            client_max_body_size 120M;
+            proxy_request_buffering off;
+        }
+        location /api/admin/ {
+            proxy_pass http://admin_backend/;
+        }
+        location /api/streaming/ {
+            proxy_pass http://streaming_backend/;
+            proxy_buffering off;
+        }
+        location / {
+            proxy_pass http://frontend_backend/;
+        }
+    }

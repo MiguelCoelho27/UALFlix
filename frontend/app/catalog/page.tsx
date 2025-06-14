@@ -36,9 +36,8 @@ export default function CatalogPage() {
     setIsLoadingVideos(true);
     setFetchError(null);
     try {
-      const catalogApiUrl =
-        process.env.NEXT_PUBLIC_CATALOG_API_URL ||
-        "http://localhost/api/catalog";
+      const catalogApiUrl = "/api/catalog";
+
       const res = await fetch(`${catalogApiUrl}/videos`);
 
       if (!res.ok) {
