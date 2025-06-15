@@ -62,10 +62,7 @@ export default function CatalogPage() {
       return;
     }
     try {
-      const catalogApiUrl =
-        process.env.NEXT_PUBLIC_CATALOG_API_URL ||
-        "http://localhost/api/catalog";
-      await fetch(`${catalogApiUrl}/videos/${video._id}/view`, {
+      await fetch(`/api/catalog/videos/${video._id}/view`, {
         method: "POST",
       });
       viewedVideos.current.add(video._id);

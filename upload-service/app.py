@@ -25,6 +25,7 @@ app.config['UPLOAD_FOLDER'] = VIDEO_FILES_PATH
 app.config['MAX_CONTENT_LENGTH'] = 120 * 1024 * 1024 
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
+# Fucking Mongol só a dar stresses
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://ualflix_admin:ualflix_password@mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin")
 client = MongoClient(MONGO_URI)
 db = client.get_database()

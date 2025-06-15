@@ -1,0 +1,98 @@
+# MongoDB Replica Set Configuration - VERSÃO SEM AUTENTICAÇÃO
+
+# --- Service Headless para DNS estável ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+spec:
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongodb
+  clusterIP: None
+  selector:
+    app: mongodb
+
+---
+# --- StatefulSet para os pods do MongoDB ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+spec:
+  serviceName: "mongodb-service"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+          command:
+            - "mongod"
+            - "--replSet"
+            - "ualflix-rs"
+            # A flag --auth foi REMOVIDA
+            - "--bind_ip_all"
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+# --- Job para inicializar APENAS o Replica Set ---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ualflix-mongo-init
+spec:
+  template:
+    spec:
+      containers:
+        - name: mongo-init-job
+          image: mongo:7.0
+          command:
+            - "sh"
+            - "-c"
+            - |
+              set -ex
+              echo "A iniciar o Job de inicialização do MongoDB (sem auth)..."
+              sleep 15
+
+              # 1. Iniciar o Replica Set
+              echo "A tentar iniciar o Replica Set..."
+              mongosh --host mongodb-0.mongodb-service:27017 --eval 'rs.initiate({ _id: "ualflix-rs", members: [ { _id: 0, host: "mongodb-0.mongodb-service:27017" }, { _id: 1, host: "mongodb-1.mongodb-service:27017" }, { _id: 2, host: "mongodb-2.mongodb-service:27017" } ] })' || echo "Replica set já pode estar iniciado."
+
+              # 2. Esperar que um nó primário seja eleito
+              echo "A aguardar pela eleição de um nó primário..."
+              until mongosh --host mongodb-0.mongodb-service:27017 --eval "db.isMaster().ismaster" | grep -q "true"; do
+                echo -n "."
+                sleep 2
+              done
+
+              echo "SUCCESS: MongoDB Replica Set está iniciado e pronto (sem autenticação)!"
+      restartPolicy: OnFailure
+  backoffLimit: 4

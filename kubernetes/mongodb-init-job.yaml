@@ -1,0 +1,50 @@
+# Ficheiro: mongodb-init-job.yaml (Versão Final com Verificação de Estado)
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ualflix-mongo-init
+spec:
+  template:
+    spec:
+      containers:
+        - name: mongo-init-job
+          image: mongo:7.0
+          command:
+            - "sh"
+            - "-c"
+            - |
+              # Usar -x para vermos todos os comandos que estão a ser executados nos logs
+              set -x
+              echo "A iniciar o Job de inicialização do MongoDB..."
+
+              # 1. Esperar que a porta de mongodb-0 esteja acessível
+              echo "A aguardar que a porta de mongodb-0.mongodb-service:27017 esteja aberta..."
+              ATTEMPTS=0
+              MAX_ATTEMPTS=30
+              until mongosh --host mongodb-0.mongodb-service:27017 --eval 'quit(0)' || [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; do
+                echo -n "."
+                sleep 2
+                ATTEMPTS=$((ATTEMPTS + 1))
+              done
+              echo "A porta do MongoDB está acessível!"
+
+              # 2. Verificar se o Replica Set já está configurado para evitar erros em re-execuções
+              # O grep procura pela mensagem de erro que aparece quando o 'rs.status()' é chamado num nó não configurado.
+              if mongosh --host mongodb-0.mongodb-service:27017 --eval "rs.status()" | grep -q "no replica set config"; then
+                # 3. Se não estiver configurado, iniciar
+                echo "Replica Set não encontrado. A iniciar..."
+                mongosh --host mongodb-0.mongodb-service:27017 --eval 'rs.initiate({ _id: "ualflix-rs", members: [ { _id: 0, host: "mongodb-0.mongodb-service:27017" }, { _id: 1, host: "mongodb-1.mongodb-service:27017" }, { _id: 2, host: "mongodb-2.mongodb-service:27017" } ] })'
+                echo "Comando rs.initiate() enviado. A aguardar 20s para a estabilização..."
+                sleep 20
+              else
+                echo "Replica Set já parece estar configurado."
+              fi
+
+              # 4. Verificação final do status para garantir que tudo está bem
+              echo "A verificar o status final do Replica Set..."
+              mongosh --host mongodb-0.mongodb-service:27017 --eval "rs.status()"
+
+              echo "SUCCESS: Job de inicialização concluído."
+      restartPolicy: OnFailure
+  backoffLimit: 4

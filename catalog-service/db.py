@@ -8,7 +8,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Primary database connection
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://mongo_primary:27017/ualflix")
+MONGO_URI = os.environ.get("MONGO_URI")
+if not MONGO_URI:
+    logger.critical("A variável de ambiente 'MONGO_URI' não está definida!")
+    raise ValueError("MONGO_URI é uma variável de ambiente obrigatória.")
+
 client = MongoClient(MONGO_URI)
 db = client.get_database()
 videos_collection = db["videos"]
@@ -159,36 +163,12 @@ def update_video(video_id, data_update, use_sync_replication=True):
 
 def delete_video(video_id, use_sync_replication=True):
     """
-    Deletes a video's file from the filesystem and its metadata from the
-    database, using the existing replication manager.
+    Deletes a video's metadata from the database.
+    Does NOT delete the physical file to simplify architecture.
     """
     try:
-        object_id = ObjectId(video_id)
-        # Find the document in the primary DB to get the file path
-        video_to_delete = videos_collection.find_one({"_id": object_id})
-        
-        if not video_to_delete:
-            logger.warning(f"Video with ID {video_id} not found. Nothing to delete.")
-            return False
-
-        video_url = video_to_delete.get("video_url")
-        if video_url:
-            video_files_path = "/app/uploads_data/videos"
-            filename = os.path.basename(video_url)
-            file_path = os.path.join(video_files_path, filename)
-            
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Successfully deleted physical video file: {file_path}")
-                except OSError as e:
-                    # Logs error but proceeds to delete the DB record anyway
-                    logger.error(f"Error deleting file {file_path}: {e}. Proceeding with DB deletion.")
-            else:
-                logger.warning(f"Video file not found at {file_path}, but deleting DB record.")
-
         if use_sync_replication:
-            #  Calling sync replication to delete from both DBs
+            # Usar o replication_manager para garantir que apaga de ambas as DBs e do cache
             success = replication_manager.replicate_sync("delete", {"video_id": video_id})
             if success:
                 logger.info(f"Video {video_id} metadata deleted with SYNCHRONOUS replication")
@@ -196,19 +176,19 @@ def delete_video(video_id, use_sync_replication=True):
                 logger.error(f"Failed to delete video {video_id} metadata with SYNCHRONOUS replication")
             return success
         else:
-            # Asynchronous path
-            result = videos_collection.delete_one({"_id": object_id})
+            # Caminho assíncrono (não usado atualmente, mas mantido por consistência)
+            result = videos_collection.delete_one({"_id": ObjectId(video_id)})
             if result.deleted_count > 0:
                 replication_manager.replicate_async("delete", {"video_id": video_id})
-                logger.info(f"Video {video_id} metadata deleted with ASYNCHRONOUS replication")
+                logger.info(f"Video {video_id} metadata queued for ASYNCHRONOUS deletion")
                 return True
-            logger.warning(f"Video {video_id} metadata not found in primary DB for async deletion.")
             return False
             
     except Exception as e:
         logger.error(f"An error occurred during the deletion process for video {video_id}: {e}")
         return False
     
+
 def get_popular_videos(limit=10):
     """Get most popular videos from cache"""
     try:

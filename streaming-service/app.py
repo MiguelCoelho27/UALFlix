@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 metrics = PrometheusMetrics(app)
 
-# This path MUST match the volume mount in your docker-compose.yml
 VIDEO_DIR = os.environ.get("UPLOADS_DIR", "/app/uploads_data/videos")
 
 def generate_chunks(filepath, start, length):

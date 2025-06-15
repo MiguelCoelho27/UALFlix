@@ -1,10 +1,11 @@
 from flask import Flask, Response, request
 import requests
 from prometheus_flask_exporter import PrometheusMetrics
+import os
 
 app = Flask(__name__)
 metrics = PrometheusMetrics(app)
-CATALOG_SERVICE_URL = "http://catalog:5000/videos"
+CATALOG_SERVICE_URL = os.environ.get("CATALOG_SERVICE_URL", "http://catalog-service:5000")
 
 @app.route("/videos", methods=['GET', 'POST'])
 def handle_videos_collection():
@@ -15,14 +16,14 @@ def handle_videos_collection():
             if not video_data:
                 return Response('{"error": "Invalid JSON"}', status=400, content_type='application/json')
             # Forward the POST request to the catalog-service
-            r = requests.post(CATALOG_SERVICE_URL, json=video_data)
+            r = requests.post(f"{CATALOG_SERVICE_URL}/videos", json=video_data)
             return Response(r.content, status=r.status_code, content_type=r.headers['content-type'])
         except Exception as e:
             return Response(f'{{"error": "{str(e)}"}}', status=500, content_type='application/json')
     
     # Handle GET request (listing)
     try:
-        r = requests.get(CATALOG_SERVICE_URL)
+        r = requests.get(f"{CATALOG_SERVICE_URL}/videos")
         return Response(r.content, status=r.status_code, content_type='application/json')
     except Exception as e:
         return Response(f'{{"error": "{str(e)}"}}', status=500, content_type='application/json')
@@ -30,7 +31,7 @@ def handle_videos_collection():
 @app.route("/videos/<video_id>", methods=['PUT', 'DELETE'])
 def handle_specific_video(video_id):
     """Handle updating or deleting a specific video."""
-    video_specific_url = f"{CATALOG_SERVICE_URL}/{video_id}"
+    video_specific_url = f"{CATALOG_SERVICE_URL}/videos/{video_id}"
 
     if request.method == 'PUT':
         try:

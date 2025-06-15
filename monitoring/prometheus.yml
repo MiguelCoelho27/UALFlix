@@ -4,13 +4,13 @@ global:
 scrape_configs:
   - job_name: "catalog-service"
     static_configs:
-      - targets: ["catalog:5000"]
+      - targets: ["catalog-service:5000"]
   - job_name: "admin-service"
     static_configs:
-      - targets: ["admin:5000"]
+      - targets: ["admin-service:5000"]
   - job_name: "upload-service"
     static_configs:
-      - targets: ["upload:5000"]
+      - targets: ["upload-service:5000"]
   - job_name: "streaming-service"
     static_configs:
-      - targets: ["streaming:5000"]
+      - targets: ["streaming-service:5000"]

@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from prometheus_flask_exporter import PrometheusMetrics
-from pymongo import MongoClient, ReadPreference
+from pymongo import MongoClient, ReadPreference, WriteConcern
+from pymongo.read_concern import ReadConcern
 from bson import ObjectId
 import os
 import logging
@@ -134,7 +135,7 @@ def create_video_route():
             "views": 0
         }
         
-        write_concern = {"w": "majority", "j": True} if use_sync else {"w": 1}
+        write_concern = WriteConcern(w="majority", j=True) if use_sync else WriteConcern(w=1)
         
         try:
             start_time = time.time()
@@ -279,23 +280,23 @@ def update_video_route(video_id):
     
 @app.route('/videos/<video_id>', methods=['DELETE'])
 def delete_video_route(video_id):
-    """Delete a video from the catalog"""
-    success = db.delete_video(video_id, use_sync_replication=True)
+    """Apaga os metadados de um vídeo da base de dados."""
+    try:
+        # Apaga de ambas as bases de dados (primary e replica)
+        delete_result = videos_collection.delete_one({"_id": ObjectId(video_id)})
+        if delete_result.deleted_count > 0:
+            invalidate_cache(video_id) # Remove do cache
+            if REDIS_AVAILABLE:
+                redis_client.zrem(POPULAR_VIDEOS_KEY, video_id) 
+            logger.info(f"Vídeo {video_id} apagado com sucesso.")
+            return jsonify({"status": "success", "message": "Video deleted successfully"}), 200
+        else:
+            return jsonify({"error": "Vídeo não encontrado"}), 404
+    except Exception as e:
+        logger.error(f"Erro ao apagar vídeo {video_id}: {e}")
+        return jsonify({"error": str(e)}), 500
     
-    if success:
-        return jsonify({"status": "success", "message": "Video deleted successfully"}), 200
-    else:
-        return jsonify({"error": "Video not found or failed to delete"}), 404
-    
-@app.route('/videos/<video_id>/view', methods=['POST'])
-def increment_video_view(video_id):
-    """Increment the view count for a specific video."""
-    success = db.increment_view_count(video_id)
-    if success:
-        return jsonify({"status": "success", "message": "View count incremented."}), 200
-    else:
-        # This could happen if the video_id is not found
-        return jsonify({"error": "Failed to increment view count."}), 404
+
 
 @app.route('/videos', methods=['GET'])
 def get_videos_route():
@@ -341,66 +342,29 @@ def get_videos_route():
 
 @app.route('/videos/<video_id>/view', methods=['POST'])
 def increment_view_route(video_id):
-    """Increment view counter with configurable write concern"""
-    write_concern_param = request.json.get('write_concern', 'majority') if request.json else 'majority'
-    
-    if USE_NATIVE_REPLICA_SET:
-        try:
-            # Choose write concern
-            if write_concern_param == "majority":
-                collection = db.get_collection("videos", write_concern={"w": "majority"})
-            else:
-                collection = db.get_collection("videos", write_concern={"w": 1})
-            
-            result = collection.update_one(
-                {"_id": ObjectId(video_id)},
-                {"$inc": {"views": 1}}
-            )
-            
-            if result.modified_count > 0:
-                # Update popularity ranking
-                if REDIS_AVAILABLE:
-                    redis_client.zincrby(POPULAR_VIDEOS_KEY, 1, video_id)
-                
-                # Invalidate cache
-                invalidate_cache(video_id)
-                
-                # Get current view count
-                updated_video = collection.find_one({"_id": ObjectId(video_id)})
-                current_views = updated_video.get("views", 0) if updated_video else 0
-                
-                logger.info(f"Views incremented for video {video_id} with {write_concern_param} write concern")
-                return jsonify({
-                    "status": "success",
-                    "message": "View count incremented",
-                    "current_views": current_views,
-                    "write_concern": write_concern_param
-                }), 200
-            else:
-                return jsonify({"error": "Video not found or failed to increment view count"}), 404
-                
-        except Exception as e:
-            logger.error(f"Error incrementing views: {e}")
-            return jsonify({"error": str(e)}), 500
-    
-    else:
-        # Use custom implementation
-        if not CUSTOM_REPLICATION_AVAILABLE:
-            return jsonify({"error": "Custom replication not available"}), 500
-            
-        success = db.increment_view_count(video_id)
+    """Incrementa a contagem de visualizações de um vídeo."""
+    try:
+        # Usar WriteConcern para garantir a escrita no replica set
+        wc = WriteConcern(w="majority", wtimeout=1000)
+        collection_with_wc = db.get_collection("videos", write_concern=wc)
         
-        if success:
-            updated_video = db.get_video_by_id(video_id, use_cache=False)
-            
-            return jsonify({
-                "status": "success", 
-                "message": "View count incremented",
-                "current_views": updated_video.get("views", 0) if updated_video else 0,
-                "replication": "async_for_performance"
-            }), 200
+        result = collection_with_wc.update_one(
+            {"_id": ObjectId(video_id)},
+            {"$inc": {"views": 1}}
+        )
+        
+        if result.modified_count > 0:
+            logger.info(f"Contagem de views incrementada para o vídeo {video_id} na base de dados.")
+            if REDIS_AVAILABLE:
+                redis_client.zincrby(POPULAR_VIDEOS_KEY, 1, video_id)
+                logger.info(f"Contagem de views incrementada para o vídeo {video_id} no Redis.")
+            invalidate_cache(video_id)
+            return jsonify({"status": "success"}), 200
         else:
-            return jsonify({"error": "Video not found or failed to increment view count"}), 404
+            return jsonify({"error": "Vídeo não encontrado para incrementar view"}), 404
+    except Exception as e:
+        logger.error(f"Erro ao incrementar views para o vídeo {video_id}: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/videos/popular', methods=['GET'])

@@ -1,5 +1,20 @@
-# UALFlix Application Services - FINAL CORRECTED VERSION
-# Dependencies: mongodb.yaml and redis.yaml must be deployed first
+# UALFlix Application Services - FIXED VERSION
+# Corrects service discovery and communication issues
+
+---
+# Persistent Volume for shared video storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-storage-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany # Changed to allow multiple pods to access
+  storageClassName: "standard"
+  resources:
+    requests:
+      storage: 10Gi
 
 ---
 # Catalog Service
@@ -7,8 +22,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: catalog-service
-  labels:
-    app: catalog-service
+  namespace: default
 spec:
   replicas: 2
   selector:
@@ -27,9 +41,14 @@ spec:
             - containerPort: 5000
           env:
             - name: MONGO_URI
-              value: "mongodb://ualflix_admin:ualflix_password@mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin"
+              value: "mongodb://ualflix_admin:ualflix_password@mongodb-0.mongodb-service:27017,mongodb-1.mongodb-service:27017,mongodb-2.mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin"
             - name: REDIS_HOST
               value: "redis-service"
+            - name: REDIS_PORT
+              value: "6379"
+          volumeMounts:
+            - name: video-storage
+              mountPath: /app/uploads_data
           resources:
             requests:
               memory: "256Mi"
@@ -37,17 +56,24 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+      volumes:
+        - name: video-storage
+          persistentVolumeClaim:
+            claimName: video-storage-pvc
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: catalog-service
+  namespace: default
 spec:
   selector:
     app: catalog-service
   ports:
     - port: 5000
       targetPort: 5000
+      name: http
   type: ClusterIP
 
 ---
@@ -56,8 +82,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: upload-service
-  labels:
-    app: upload-service
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -68,10 +93,6 @@ spec:
       labels:
         app: upload-service
     spec:
-      volumes:
-        - name: upload-storage
-          persistentVolumeClaim:
-            claimName: upload-pvc
       containers:
         - name: upload
           image: iulian169/ualflix-upload:v1
@@ -80,11 +101,13 @@ spec:
             - containerPort: 5000
           env:
             - name: MONGO_URI
-              value: "mongodb://ualflix_admin:ualflix_password@mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin"
+              value: "mongodb://ualflix_admin:ualflix_password@mongodb-0.mongodb-service:27017,mongodb-1.mongodb-service:27017,mongodb-2.mongodb-service:27017/ualflix?replicaSet=ualflix-rs&authSource=admin"
             - name: CATALOG_SERVICE_URL
               value: "http://catalog-service:5000/videos"
+            - name: UPLOADS_DIR
+              value: "/app/uploads_data"
           volumeMounts:
-            - name: upload-storage
+            - name: video-storage
               mountPath: /app/uploads_data
           resources:
             requests:
@@ -93,29 +116,25 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "500m"
+      volumes:
+        - name: video-storage
+          persistentVolumeClaim:
+            claimName: video-storage-pvc
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: upload-service
+  namespace: default
 spec:
   selector:
     app: upload-service
   ports:
     - port: 5000
       targetPort: 5000
+      name: http
   type: ClusterIP
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: upload-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
 
 ---
 # Streaming Service
@@ -123,8 +142,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: streaming-service
-  labels:
-    app: streaming-service
+  namespace: default
 spec:
   replicas: 2
   selector:
@@ -135,18 +153,17 @@ spec:
       labels:
         app: streaming-service
     spec:
-      volumes:
-        - name: upload-storage
-          persistentVolumeClaim:
-            claimName: upload-pvc
       containers:
         - name: streaming
           image: iulian169/ualflix-streaming:v1
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
+          env:
+            - name: UPLOADS_DIR
+              value: "/app/uploads_data/videos"
           volumeMounts:
-            - name: upload-storage
+            - name: video-storage
               mountPath: /app/uploads_data
               readOnly: true
           resources:
@@ -156,17 +173,24 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "250m"
+      volumes:
+        - name: video-storage
+          persistentVolumeClaim:
+            claimName: video-storage-pvc
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: streaming-service
+  namespace: default
 spec:
   selector:
     app: streaming-service
   ports:
     - port: 5000
       targetPort: 5000
+      name: http
   type: ClusterIP
 
 ---
@@ -175,8 +199,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: admin-service
-  labels:
-    app: admin-service
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -203,27 +226,29 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "250m"
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: admin-service
+  namespace: default
 spec:
   selector:
     app: admin-service
   ports:
     - port: 5000
       targetPort: 5000
+      name: http
   type: ClusterIP
 
 ---
-# Frontend
+# Frontend Service
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  labels:
-    app: frontend
+  namespace: default
 spec:
   replicas: 2
   selector:
@@ -247,48 +272,142 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "100m"
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend
+  name: frontend-service
+  namespace: default
 spec:
   selector:
     app: frontend
   ports:
     - port: 80
       targetPort: 80
+      name: http
   type: ClusterIP
+
 ---
-# NGINX Load Balancer
+# NGINX Load Balancer with corrected configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: default
+data:
+  default.conf: |
+    upstream catalog_backend {
+        server catalog-service:5000;
+    }
+
+    upstream upload_backend {
+        server upload-service:5000;
+    }
+
+    upstream admin_backend {
+        server admin-service:5000;
+    }
+
+    upstream streaming_backend {
+        server streaming-service:5000;
+    }
+
+    upstream frontend_backend {
+        server frontend-service:80;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+        
+        client_max_body_size 120M;
+        
+        # Frontend (default)
+        location / {
+            proxy_pass http://frontend_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Catalog API
+        location /api/catalog/ {
+            proxy_pass http://catalog_backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Upload API
+        location /api/upload {
+            proxy_pass http://upload_backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # File upload settings
+            client_max_body_size 120M;
+            proxy_request_buffering off;
+        }
+        
+        # Admin API
+        location /api/admin/ {
+            proxy_pass http://admin_backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Streaming API
+        location /api/streaming/ {
+            proxy_pass http://streaming_backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Streaming settings
+            proxy_buffering off;
+            proxy_cache off;
+        }
+        
+        # Health check
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+
+---
+# NGINX Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-service
-  labels:
-    app: nginx-service
+  name: nginx
+  namespace: default
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: nginx-service
+      app: nginx
   template:
     metadata:
       labels:
-        app: nginx-service
+        app: nginx
     spec:
-      volumes:
-        - name: nginx-config-volume
-          configMap:
-            name: nginx-config
       containers:
         - name: nginx
-          image: iulian169/ualflix-nginx:v1
-          imagePullPolicy: Always
+          image: nginx:alpine
           ports:
             - containerPort: 80
           volumeMounts:
-            - name: nginx-config-volume
+            - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
           resources:
@@ -298,63 +417,23 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "100m"
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+
 ---
+# NGINX LoadBalancer Service (External Access)
 apiVersion: v1
 kind: Service
 metadata:
   name: nginx-service
+  namespace: default
 spec:
   selector:
-    app: nginx-service
+    app: nginx
   ports:
     - port: 80
       targetPort: 80
-  type: LoadBalancer
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-config
-data:
-  default.conf: |
-    upstream catalog_backend {
-        server catalog-service:5000;
-    }
-    upstream upload_backend {
-        server upload-service:5000;
-    }
-    upstream admin_backend {
-        server admin-service:5000;
-    }
-    upstream streaming_backend {
-        server streaming-service:5000;
-    }
-    upstream frontend_backend {
-        server frontend:80;
-    }
-    server {
-        listen 80;
-        server_name _;
-        resolver 127.0.0.11 valid=10s;
-
-        client_max_body_size 120M;
-
-        location /api/catalog/ {
-            proxy_pass http://catalog_backend/;
-        }
-        location /api/upload {
-            proxy_pass http://upload_backend/;
-            client_max_body_size 120M;
-            proxy_request_buffering off;
-        }
-        location /api/admin/ {
-            proxy_pass http://admin_backend/;
-        }
-        location /api/streaming/ {
-            proxy_pass http://streaming_backend/;
-            proxy_buffering off;
-        }
-        location / {
-            proxy_pass http://frontend_backend/;
-        }
-    }
+      nodePort: 30080 # Fixed NodePort for consistent access
+  type: NodePort # Changed from LoadBalancer for local testing

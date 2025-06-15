@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  default.conf: |
+    upstream catalog_backend { server catalog-service:5000; }
+    upstream upload_backend { server upload-service:5000; }
+    upstream admin_backend { server admin-service:5000; }
+    upstream streaming_backend { server streaming-service:5000; }
+    upstream frontend_backend { server frontend:80; }
+    upstream prometheus_backend { server prometheus-service:9090; }
+    upstream grafana_backend { server grafana-service:3000; }
+    upstream redis_commander_backend { server redis-commander-service:8081; }
+
+    server {
+        listen 80;
+        client_max_body_size 120M;
+
+        location /api/catalog/ { proxy_pass http://catalog_backend/; }
+        location /api/admin/ { proxy_pass http://admin_backend/; }
+        location /api/upload {
+            client_max_body_size 120M;
+            proxy_request_buffering off;
+            proxy_pass http://upload_backend/;
+        }
+        location /api/streaming/ {
+            proxy_buffering off;
+            proxy_pass http://streaming_backend/;
+        }
+        location /prometheus/ { proxy_pass http://prometheus_backend/; }
+        location /grafana/ { proxy_pass http://grafana_backend/; }
+        location /redis-commander/ { proxy_pass http://redis_commander_backend/; }
+        
+        location / {
+            proxy_pass http://frontend_backend/;
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-service
+  labels:
+    app: nginx-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-service
+  template:
+    metadata:
+      labels:
+        app: nginx-service
+    spec:
+      volumes:
+        - name: nginx-config-volume
+          configMap:
+            name: nginx-config
+      containers:
+        - name: nginx
+          image: iulian169/ualflix-nginx:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx-service
+  ports:
+    - port: 80
+      targetPort: 80
+  type: LoadBalancer # Este é o seu ponto de entrada para o cluster
