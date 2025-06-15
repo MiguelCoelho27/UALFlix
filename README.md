@@ -7,26 +7,28 @@ Pre-Requesites
 
 ▶️ Como Executar o Ambiente
 
-Clonar o Repositorio
+##Clonar o Repositorio
 git clone https://github.com/MiguelCoelho27/UALFlix.git
 
-Ir para a diretoria certa :
+##Ir para a diretoria certa :
 cd UALFlix/kubernetes
 
-Tornar os Scripts Executáveis ( Só uma vez )
+##Tornar os Scripts Executáveis ( Só uma vez )
 chmod +x deploy.sh cleanup.sh grafana.sh prometheus.sh redis.sh
 
-Executar o Script de Deploy
+##Executar o Script de Deploy
 
 ./deploy.sh
 
-Nota: O processo pode demorar vários minutos na primeira vez.
+##Nota: O processo pode demorar vários minutos na primeira vez.
 
 A Aplicação está acessivel pelo URL dado
 
 Para abrir as restantes funções :
 
-## Usar estes ficheiros em terminais diferentes para executar. grafana.sh prometheus.sh redis.sh
+## Usar estes ficheiros em terminais diferentes para executar. 
+
+grafana.sh prometheus.sh redis.sh
 
 Abrir Terminais diferentes e executar cada ficheiro para Monitorização.
 
