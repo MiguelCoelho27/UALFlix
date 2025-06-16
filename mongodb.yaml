@@ -150,7 +150,7 @@ spec:
             storage: 5Gi
 
 ---
-# ConfigMap for MongoDB initialization script (optional)
+# ConfigMap for MongoDB initialization script
 apiVersion: v1
 kind: ConfigMap
 metadata:
