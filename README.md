@@ -7,31 +7,34 @@ Pre-Requesites
 
 ▶️ Como Executar o Ambiente
 
-##Clonar o Repositorio
-git clone https://github.com/MiguelCoelho27/UALFlix.git
+Clonar o Repositorio
 
-##Ir para a diretoria certa :
-cd UALFlix/kubernetes
+  git clone https://github.com/MiguelCoelho27/UALFlix.git
 
-##Tornar os Scripts Executáveis ( Só uma vez )
-chmod +x deploy.sh cleanup.sh grafana.sh prometheus.sh redis.sh
+Ir para a diretoria certa :
 
-##Executar o Script de Deploy
+  cd UALFlix/kubernetes
 
-./deploy.sh
+Tornar os Scripts Executáveis ( Só uma vez )
 
-##Nota: O processo pode demorar vários minutos na primeira vez.
+  chmod +x deploy.sh cleanup.sh grafana.sh prometheus.sh redis.sh
+
+Executar o Script de Deploy
+
+  ./deploy.sh
+
+Nota: O processo pode demorar vários minutos na primeira vez. E pode ser necessário correr o script mais do que uma vez.
 
 A Aplicação está acessivel pelo URL dado
 
 Para abrir as restantes funções :
 
-## Usar estes ficheiros em terminais diferentes para executar. 
+Usar estes ficheiros em terminais diferentes para executar. 
 
-grafana.sh prometheus.sh redis.sh
+  grafana.sh prometheus.sh redis.sh
 
 Abrir Terminais diferentes e executar cada ficheiro para Monitorização.
 
-## grafana.sh prometheus.sh redis.sh
+  grafana.sh prometheus.sh redis.sh
 
 Se estiver laggado é porque o Minikube sucks
