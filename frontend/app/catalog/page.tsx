@@ -131,7 +131,7 @@ export default function CatalogPage() {
           {!isLoadingVideos && !fetchError && videos.length === 0 && (
             <div className="text-center text-muted-foreground py-10 border-2 border-dashed border-border rounded-lg p-8">
               <p className="text-lg">No videos available in the catalog yet.</p>
-              <p>Try uploading some videos first!</p>
+              <p>Try uploading some videos first</p>
             </div>
           )}
 

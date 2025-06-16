@@ -133,7 +133,7 @@ services:
       - ualflix_net
     restart: unless-stopped
 
-  # MONITORING SERVICE (Optional)
+  # MONITORING SERVICE
   redis_commander:
     image: rediscommander/redis-commander:latest
     ports:
@@ -146,7 +146,7 @@ services:
       - ualflix_net
     restart: unless-stopped
 
-  # MONGO EXPRESS to visualize data (Optional)
+  # MONGO EXPRESS to visualize data
   mongo_express_primary:
     image: mongo-express:latest
     ports:
@@ -190,7 +190,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     ports:
-      - "3001:3000" # Expose Grafana on host port 3001
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     networks:

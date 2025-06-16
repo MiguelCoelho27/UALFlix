@@ -60,8 +60,7 @@ export default function UploadPage() {
 
         <footer className="text-center py-8 mt-12 border-t border-border">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} UALFlix. Project for Advanced
-            Systems Architecture.
+            &copy; {new Date().getFullYear()} UALFlix. Projeto de AAS
           </p>
         </footer>
       </div>
